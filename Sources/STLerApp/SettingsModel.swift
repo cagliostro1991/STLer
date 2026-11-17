@@ -1,8 +1,8 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
-/// Holds the editable config, saves it on every change and renders the live preview.
+/// Editable config for the settings window: saves on every change and renders the live preview off the main thread.
 final class SettingsModel: ObservableObject {
     enum ResetScope { case finderFolder, watched }
 
@@ -13,30 +13,22 @@ final class SettingsModel: ObservableObject {
             refreshPreview()
         }
     }
-    @Published var preview: NSImage?
-    @Published var sample: URL?
-    @Published var status = ""
-    @Published var busy = false
+    @Published private(set) var preview: NSImage?
+    @Published private(set) var sample: URL?
+    @Published private(set) var status = ""
+    @Published private(set) var busy = false
+    /// Set by the UI to ask for confirmation before a destructive reset.
     @Published var pendingReset: ResetScope?
 
-    private let queue = DispatchQueue(label: "styler.render", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "stler.render", qos: .userInitiated)
     private var previewToken = 0
 
     init() {
-        if let folder = activeFinderFolder() {
-            sample = collectFiles([folder], formats: config.formats.filter { $0 != "step" }, maxDepth: 2).first.map { URL(fileURLWithPath: $0) }
+        if let folder = FinderFolder.front() {
+            let formats = config.formats.filter { $0 != "step" }
+            sample = FileScanner.collect([folder], formats: formats, maxDepth: 2).first.map { URL(fileURLWithPath: $0) }
         }
         refreshPreview()
-    }
-
-    func refreshPreview() {
-        guard let url = sample else { preview = nil; return }
-        previewToken += 1
-        let token = previewToken, c = config
-        queue.async {
-            let img = parseColor(c.color).flatMap { render(stl: url, size: CGSize(width: 384, height: 384), view: c.view, color: $0, firstPlateOnly: c.firstPlateOnly, badge: c.badge) }
-            DispatchQueue.main.async { if token == self.previewToken { self.preview = img } }
-        }
     }
 
     func chooseSample() {
@@ -61,10 +53,10 @@ final class SettingsModel: ObservableObject {
     }
 
     func applyToFinderFolder() {
-        guard let folder = activeFinderFolder() else { status = "No Finder window, or Automation access to Finder was denied."; return }
-        let c = config
+        guard let folder = FinderFolder.front() else { status = Self.noFinderMessage; return }
+        let config = config
         work("Rendering \(folder) ...") {
-            let r = processFolder(folder, config: c)
+            let r = IconBatch.applyToFolder(folder, config: config)
             return "\(folder): rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)"
         }
     }
@@ -72,12 +64,24 @@ final class SettingsModel: ObservableObject {
     func reset(_ scope: ResetScope) {
         var paths = config.watch
         if scope == .finderFolder {
-            guard let folder = activeFinderFolder() else { status = "No Finder window, or Automation access to Finder was denied."; return }
+            guard let folder = FinderFolder.front() else { status = Self.noFinderMessage; return }
             paths = [folder]
         }
         work("Resetting icons ...") {
-            let r = resetIcons(collectFiles(paths, formats: Array(Config.supportedFormats)))
-            return "Reset \(r.reset) icons, left \(r.untouched) untouched (no STyLer signature)."
+            let r = IconBatch.reset(FileScanner.collect(paths, formats: Array(Config.supportedFormats)))
+            return "Reset \(r.reset) icons, left \(r.untouched) untouched (no STLer signature)."
+        }
+    }
+
+    private static let noFinderMessage = "No Finder window, or Automation access to Finder was denied."
+
+    private func refreshPreview() {
+        guard let url = sample else { preview = nil; return }
+        previewToken += 1
+        let token = previewToken, options = IconRenderer.Options(config: config)
+        queue.async {
+            let image = IconRenderer.render(url, size: CGSize(width: 384, height: 384), options: options)
+            DispatchQueue.main.async { if token == self.previewToken { self.preview = image } }
         }
     }
 

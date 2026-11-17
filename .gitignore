@@ -2,3 +2,8 @@
 build/
 plans/
 .DS_Store
+
+# Unused parts of the icon pack stay on disk but out of the repo
+icons/macOS/AppIcon.appiconset/
+icons/macOS/Dock-Monochrome-BW/
+icons/macOS/MenuBar-Template/

@@ -1,8 +1,24 @@
 import SwiftUI
 import AppKit
 
+private extension ViewAngle {
+    var title: String { self == .iso ? "Isometric" : rawValue.capitalized }
+}
+
+private extension BadgeCorner {
+    var title: String {
+        switch self {
+        case .off: "Off"
+        case .topLeft: "Top left"
+        case .topRight: "Top right"
+        case .bottomLeft: "Bottom left"
+        case .bottomRight: "Bottom right"
+        }
+    }
+}
+
 /// Lowercase `#rrggbb` for a colour picked in the UI.
-func hexString(_ color: NSColor) -> String {
+private func hexString(_ color: NSColor) -> String {
     let c = color.usingColorSpace(.sRGB) ?? color
     return String(format: "#%02x%02x%02x", Int((c.redComponent * 255).rounded()), Int((c.greenComponent * 255).rounded()), Int((c.blueComponent * 255).rounded()))
 }
@@ -10,15 +26,12 @@ func hexString(_ color: NSColor) -> String {
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
-    private let views = ["iso", "front", "back", "left", "right", "top", "bottom"]
-    private let badges = [("off", "Off"), ("topLeft", "Top left"), ("topRight", "Top right"), ("bottomLeft", "Bottom left"), ("bottomRight", "Bottom right")]
-
     private var systemColor: Binding<Bool> {
         Binding(get: { model.config.color == "system" }, set: { model.config.color = $0 ? "system" : "#808080" })
     }
 
     private var customColor: Binding<Color> {
-        Binding(get: { Color(nsColor: parseColor(model.config.color) ?? .systemGray) }, set: { model.config.color = hexString(NSColor($0)) })
+        Binding(get: { Color(nsColor: model.config.nsColor) }, set: { model.config.color = hexString(NSColor($0)) })
     }
 
     private func format(_ ext: String) -> Binding<Bool> {
@@ -36,12 +49,12 @@ struct SettingsView: View {
             Form {
                 Section("Appearance") {
                     Picker("View", selection: $model.config.view) {
-                        ForEach(views, id: \.self) { Text($0 == "iso" ? "Isometric" : $0.capitalized).tag($0) }
+                        ForEach(ViewAngle.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     Toggle("System default colour", isOn: systemColor)
                     ColorPicker("Colour", selection: customColor, supportsOpacity: false).disabled(model.config.color == "system")
                     Picker("Format label", selection: $model.config.badge) {
-                        ForEach(badges, id: \.0) { Text($0.1).tag($0.0) }
+                        ForEach(BadgeCorner.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                 }
                 Section("Files") {
@@ -95,14 +108,14 @@ struct SettingsView: View {
             }
             .padding(20)
         }
-        .frame(minHeight: 620)
-        .confirmationDialog("Remove STyLer icons?", isPresented: Binding(get: { model.pendingReset != nil }, set: { if !$0 { model.pendingReset = nil } }), titleVisibility: .visible) {
+        .frame(minHeight: 760)
+        .confirmationDialog("Remove STLer icons?", isPresented: Binding(get: { model.pendingReset != nil }, set: { if !$0 { model.pendingReset = nil } }), titleVisibility: .visible) {
             Button("Reset", role: .destructive) {
                 if let scope = model.pendingReset { model.reset(scope) }
                 model.pendingReset = nil
             }
         } message: {
-            Text("Only icons set by STyLer are removed. Custom icons you set yourself stay.")
+            Text("Only icons set by STLer are removed. Custom icons you set yourself stay.")
         }
     }
 }
