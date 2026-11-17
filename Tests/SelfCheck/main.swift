@@ -363,6 +363,46 @@ for index in 0..<60 { try "x".write(to: siblingsDir.appendingPathComponent("many
 check(FileScanner.siblings(of: siblingsDir.appendingPathComponent("a.stl").path, formats: ["stl"]).count == FileScanner.siblingLimit, "siblings are capped so one open never starts a long job")
 var folderFlag = Config()
 check(!folderFlag.followOpenedFolder && folderFlag.set("followOpenedFolder", "yes") != nil && folderFlag.set("followOpenedFolder", "true") == nil && folderFlag.followOpenedFolder, "the opened-folder option is off by default and validated")
+let versionFile = (try? String(contentsOfFile: "VERSION", encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+check(versionFile == AppVersion.current && SemVer(AppVersion.current) != nil, "VERSION and AppVersion.current agree and are a valid version")
+let sortedVersions = ["0.1.0", "0.1.0-beta.2", "0.1.0-beta.10", "0.1.0-beta.1", "0.2.0-beta.1", "v0.0.9"].compactMap(SemVer.init).sorted().map { "\($0.numbers.map(String.init).joined(separator: "."))\($0.isPrerelease ? "-" + $0.prerelease.joined(separator: ".") : "")" }
+check(sortedVersions == ["0.0.9", "0.1.0-beta.1", "0.1.0-beta.2", "0.1.0-beta.10", "0.1.0", "0.2.0-beta.1"], "versions sort like semver: beta.2 before beta.10, a release after its betas")
+check(SemVer("1.2") == nil && SemVer("a.b.c") == nil && SemVer("nightly") == nil, "things that are not versions are rejected")
+let releasesJSON = Data(##"[{"tag_name":"v0.1.0-beta.2","html_url":"https://example.com/2","prerelease":true,"draft":false},{"tag_name":"v0.1.0-beta.3","html_url":"https://example.com/3","prerelease":true,"draft":true},{"tag_name":"v0.0.9","html_url":"https://example.com/9","prerelease":false,"draft":false},{"tag_name":"nightly","html_url":"https://example.com/n","prerelease":true,"draft":false}]"##.utf8)
+check(UpdateChecker.newest(in: releasesJSON)?.tag == "v0.1.0-beta.2", "the newest release skips drafts and tags that are not versions")
+check(UpdateChecker.outcome(for: releasesJSON, current: "0.1.0-beta.1") == .available(UpdateChecker.newest(in: releasesJSON)!), "a beta is offered a newer beta")
+check(UpdateChecker.outcome(for: releasesJSON, current: "0.1.0-beta.2") == .upToDate, "the latest beta is up to date")
+check(UpdateChecker.outcome(for: releasesJSON, current: "0.0.8") == .available(UpdateChecker.newest(in: Data(##"[{"tag_name":"v0.0.9","html_url":"https://example.com/9","prerelease":false}]"##.utf8))!), "a stable build is offered only stable releases")
+check(UpdateChecker.outcome(for: Data("[]".utf8), current: "0.1.0-beta.1") == .upToDate && UpdateChecker.outcome(for: Data("nope".utf8), current: "0.1.0-beta.1") == .upToDate, "an empty or broken release list means nothing newer")
+let cancelQueue = JobQueue()
+let cancelGate = DispatchSemaphore(value: 0)
+var cancelSteps = 0
+var cancelOrder: [String] = []
+let cancelLock = NSLock()
+cancelQueue.enqueue("long") { reporter in
+    cancelGate.wait()
+    for _ in 0..<1000 where !reporter.isCancelled() { cancelLock.lock(); cancelSteps += 1; cancelLock.unlock(); Thread.sleep(forTimeInterval: 0.001) }
+    return reporter.isCancelled() ? "cancelled" : "finished"
+}
+cancelQueue.enqueue("next") { _ in cancelLock.lock(); cancelOrder.append("next"); cancelLock.unlock(); return "ok" }
+cancelQueue.enqueue("dropped") { _ in cancelLock.lock(); cancelOrder.append("dropped"); cancelLock.unlock(); return "ok" }
+let droppedID = cancelQueue.jobs.first { $0.title == "dropped" }!.id
+cancelQueue.cancel(droppedID)
+while cancelQueue.jobs.first?.state != .running { Thread.sleep(forTimeInterval: 0.005) }
+cancelQueue.cancel(cancelQueue.jobs.first { $0.title == "long" }!.id)
+cancelGate.signal()
+cancelQueue.waitUntilIdle()
+check(cancelQueue.jobs.first?.summary == "cancelled" && cancelSteps == 0, "a running job sees the cancel and stops at its next step")
+check(cancelOrder == ["next"], "a waiting job that was cancelled never runs, the others still do")
+let cancelLog = FileManager.default.temporaryDirectory.appendingPathComponent("stler-cancel-\(UUID().uuidString).json")
+setenv("STLER_LOG", cancelLog.path, 1)
+let foreignEntry = ActivityLog.Entry(title: "Finder: ~/x", running: true)
+ActivityLog.upsert(foreignEntry)
+check(!ActivityLog.isCancelRequested(foreignEntry.id), "a fresh entry is not cancelled")
+ActivityLog.requestCancel(foreignEntry.id)
+check(ActivityLog.isCancelRequested(foreignEntry.id), "the window can ask another process to cancel its entry through the shared log")
+unsetenv("STLER_LOG")
+try? FileManager.default.removeItem(at: cancelLog)
 func tintedPixels(_ image: NSImage?) -> (red: Int, blue: Int) {
     guard let tiff = image?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return (0, 0) }
     var counts = (red: 0, blue: 0)

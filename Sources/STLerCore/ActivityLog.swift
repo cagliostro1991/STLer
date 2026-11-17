@@ -11,6 +11,8 @@ enum ActivityLog {
         var total = 0
         var current = ""
         var summary = ""
+        /// Set by the window to ask the process that owns the entry to stop.
+        var cancelRequested: Bool?
         /// Seconds since 1970 of the last change.
         var time = Date().timeIntervalSince1970
     }
@@ -30,6 +32,17 @@ enum ActivityLog {
             let finished = entries.indices.filter { !entries[$0].running }
             for index in finished.dropLast(JobQueue.keepFinished).reversed() { entries.remove(at: index) }
         }
+    }
+
+    /// Asks the process that runs the entry (`stler follow`) to stop; it checks `isCancelRequested` between files.
+    static func requestCancel(_ id: UUID) {
+        modify { entries in
+            if let index = entries.firstIndex(where: { $0.id == id }) { entries[index].cancelRequested = true }
+        }
+    }
+
+    static func isCancelRequested(_ id: UUID) -> Bool {
+        modify { _ in }.first { $0.id == id }?.cancelRequested == true
     }
 
     /// Drops one entry, for a scan that turned out to have nothing to do.

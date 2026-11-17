@@ -56,9 +56,11 @@ enum IconBatch {
 
     /// Removes only icons carrying our signature, so icons set by the user stay.
     /// - Returns: How many files were reset and how many were left alone.
-    static func reset(_ files: [String], onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil) -> (reset: Int, untouched: Int) {
+    static func reset(_ files: [String], onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> (reset: Int, untouched: Int, interrupted: Bool) {
         var done = 0
+        var interrupted = false
         for (index, file) in files.enumerated() {
+            if let shouldContinue, !shouldContinue() { interrupted = true; break }
             onProgress?(index + 1, files.count, file)
             guard Signature.read(file) != nil else { continue }
             preservingModDate(file) {
@@ -68,7 +70,7 @@ enum IconBatch {
             done += 1
         }
         resetQuickLookCache()
-        return (done, files.count - done)
+        return (done, files.count - done, interrupted)
     }
 
     /// The file's type when it is enabled and its icon is missing or out of date.

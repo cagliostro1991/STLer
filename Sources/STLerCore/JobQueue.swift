@@ -23,6 +23,8 @@ final class JobQueue {
     /// What a job's work closure uses to report while it runs.
     struct Reporter {
         let progress: (_ done: Int, _ total: Int, _ file: String) -> Void
+        /// True once the user cancelled this job; the work should stop at the next file.
+        let isCancelled: () -> Bool
     }
 
     /// Called after every change, from the worker thread or from the thread that enqueues; it may run concurrently.
@@ -32,6 +34,7 @@ final class JobQueue {
     private var items: [Job] = []
     private let worker = DispatchQueue(label: "stler.jobs", qos: .userInitiated)
     private let group = DispatchGroup()
+    private var cancelled = Set<UUID>()
 
     var jobs: [Job] {
         lock.lock(); defer { lock.unlock() }
@@ -49,6 +52,9 @@ final class JobQueue {
             self.update(job.id) { $0.state = .running }
             let summary = work(Reporter(progress: { done, total, file in
                 self.update(job.id) { $0.done = done; $0.total = total; $0.current = file }
+            }, isCancelled: {
+                self.lock.lock(); defer { self.lock.unlock() }
+                return self.cancelled.contains(job.id)
             }))
             self.update(job.id) { $0.state = .done; $0.summary = summary; $0.current = ""; $0.finishedAt = Date() }
             self.change { items in
@@ -57,6 +63,14 @@ final class JobQueue {
             }
             self.group.leave()
         }
+    }
+
+    /// Cancels one job: a waiting one is dropped and never runs, a running one is asked to stop at its next file.
+    func cancel(_ id: UUID) {
+        lock.lock()
+        cancelled.insert(id)
+        lock.unlock()
+        change { $0.removeAll { $0.id == id && $0.state == .queued } }
     }
 
     /// Removes the finished jobs and cancels the ones still waiting; the running job is left alone.

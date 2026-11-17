@@ -11,6 +11,7 @@ usage:
         [--label off|topLeft|topRight|bottomLeft|bottomRight] [--depth N|deep] [--force] [--dry-run] [<folder|file>...]
   stler follow                 render the folder in front in Finder, down to config followDepth
   stler install | uninstall    LaunchAgent that keeps `follow` running at login
+  stler version | update       print the version / look for a newer release on GitHub
   stler reset <folder|file>... remove icons set by stler
   stler config get [key] | set <key> <value>
 views: iso front back left right top bottom
@@ -129,6 +130,7 @@ func follow() -> Never {
             var lastCheck = Date()
             var entry = ActivityLog.Entry(title: "Finder: \((current as NSString).abbreviatingWithTildeInPath)", running: true)
             var published = false
+            var cancelled = false
             let started = Date()
             var lastWrite = Date.distantPast
             let result = IconBatch.applyToFolder(current, config: Config.load(), onProgress: { done, total, file in
@@ -141,20 +143,22 @@ func follow() -> Never {
             }, shouldContinue: {
                 guard Date().timeIntervalSince(lastCheck) > 1.5 else { return true }
                 lastCheck = Date()
+                if published, ActivityLog.isCancelRequested(entry.id) { cancelled = true; return false }
                 let front = FinderFolder.front()
                 return front == nil || front == current
             })
-            if result.rendered > 0 || result.failed > 0 {
+            let reason = cancelled ? " (cancelled)" : result.interrupted ? " (interrupted, another folder opened)" : ""
+            if result.rendered > 0 || result.failed > 0 || cancelled {
                 entry.running = false
                 entry.current = ""
-                entry.summary = summary(result) + (result.interrupted ? " (interrupted, another folder opened)" : "")
+                entry.summary = summary(result) + reason
                 ActivityLog.upsert(entry)
             } else if published {
                 ActivityLog.remove(entry.id)
             }
-            if result.interrupted { state.forget(current) }
-            print("\(current): \(summary(result))\(result.interrupted ? " (interrupted, another folder opened)" : "")")
-            folder = result.interrupted ? FinderFolder.front() : nil
+            if result.interrupted, !cancelled { state.forget(current) }
+            print("\(current): \(summary(result))\(reason)")
+            folder = result.interrupted && !cancelled ? FinderFolder.front() : nil
         }
     }
     let watcher = OpenedFileWatcher()
@@ -190,6 +194,20 @@ func follow() -> Never {
     tick()
     syncWatcher()
     Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in tick(); syncWatcher() }
+    RunLoop.main.run()
+    exit(0)
+}
+
+/// `stler update`: asks GitHub whether a newer release exists and prints the answer.
+func checkForUpdate() -> Never {
+    UpdateChecker.check { outcome in
+        switch outcome {
+        case .upToDate: print("stler \(AppVersion.current) is up to date")
+        case .available(let release): print("stler \(release.tag) is available (you have \(AppVersion.current)): \(release.url.absoluteString)")
+        case .failed(let message): FileHandle.standardError.write(Data((message + "\n").utf8)); exit(1)
+        }
+        exit(0)
+    }
     RunLoop.main.run()
     exit(0)
 }

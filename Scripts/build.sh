@@ -12,6 +12,8 @@ swiftc -O -parse-as-library Sources/STLerCore/*.swift Sources/STLerApp/*.swift -
 
 iconutil -c icns icons/macOS/AppIcon.iconset -o $APP/Contents/Resources/AppIcon.icns
 cp Sources/STLerApp/Info.plist $APP/Contents/Info.plist
+VERSION=$(cat VERSION)
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $VERSION" $APP/Contents/Info.plist
 cp Sources/STLerApp/Resources/3DBenchy.* $APP/Contents/Resources/
 
 codesign -f -s - $APP

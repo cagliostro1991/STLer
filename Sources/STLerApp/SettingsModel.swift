@@ -45,6 +45,12 @@ final class SettingsModel: ObservableObject {
     /// Whether `stler follow` is installed as a LaunchAgent and running.
     @Published private(set) var agent = FollowAgent.State.notInstalled
     @Published var showAgentInfo = false
+    /// Result of the last look for a newer release; `nil` before any check.
+    @Published private(set) var update: UpdateChecker.Outcome?
+    @Published private(set) var checkingUpdate = false
+    /// Signature of each type's settings as last applied to files, remembered across launches. A type whose current
+    /// signature differs has changes that no file shows yet.
+    @Published private(set) var applied: [FileType: String] = [:]
     /// The first-launch explanation; shown once, and again from the help button in the header.
     @Published var showWelcome = !UserDefaults.standard.bool(forKey: "welcomeShown")
     @Published var pending: Pending?
@@ -67,13 +73,39 @@ final class SettingsModel: ObservableObject {
             samples[type] = remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 ?? Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
         }
+        for type in FileType.allCases {
+            let key = "applied.\(type.rawValue)"
+            if let known = UserDefaults.standard.string(forKey: key) {
+                applied[type] = known
+            } else {
+                applied[type] = Signature.make(for: config, type: type)
+                UserDefaults.standard.set(applied[type], forKey: key)
+            }
+        }
         refreshFreecad()
         refreshPreview()
         jobQueue.didChange = { [weak self] in DispatchQueue.main.async { self?.refreshJournal() } }
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refreshJournal() }
         refreshAgent()
+        if config.checkUpdates, Date().timeIntervalSince(UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date ?? .distantPast) > 86_400 { checkForUpdate() }
         Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.refreshAgent() }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.refreshAgent() }
+    }
+
+    /// Asks GitHub for the newest release. Called at launch (at most once a day, when enabled) and by the button.
+    func checkForUpdate() {
+        checkingUpdate = true
+        UserDefaults.standard.set(Date(), forKey: "lastUpdateCheck")
+        UpdateChecker.check { outcome in
+            self.update = outcome
+            self.checkingUpdate = false
+        }
+    }
+
+    /// Cancels a job of this window directly, a job of `stler follow` through the shared log.
+    func cancel(_ job: Job) {
+        if jobQueue.jobs.contains(where: { $0.id == job.id }) { jobQueue.cancel(job.id) } else { ActivityLog.requestCancel(job.id) }
+        refreshJournal()
     }
 
     /// Empties the journal: finished entries (also those of `follow`) go, waiting jobs are cancelled, a running one stays.
@@ -95,6 +127,17 @@ final class SettingsModel: ObservableObject {
             let state = FollowAgent.state()
             DispatchQueue.main.async { if state != self.agent { self.agent = state } }
         }
+    }
+
+    /// True when the settings of `type` changed since they were last applied to files.
+    func hasUnappliedChanges(_ type: FileType) -> Bool {
+        config[type].enabled && applied[type] != Signature.make(for: config, type: type)
+    }
+
+    private func markApplied(_ type: FileType, config: Config) {
+        let signature = Signature.make(for: config, type: type)
+        applied[type] = signature
+        UserDefaults.standard.set(signature, forKey: "applied.\(type.rawValue)")
     }
 
     /// Opens Terminal with `stler install`, see `FollowAgent.installInTerminal`.
@@ -278,13 +321,14 @@ final class SettingsModel: ObservableObject {
         switch action {
         case .clear:
             jobQueue.enqueue("Clear \(type.title) icons (\(files.count) files)") { reporter in
-                let r = IconBatch.reset(files, onProgress: reporter.progress)
-                return "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
+                let r = IconBatch.reset(files, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
+                return (r.interrupted ? "Cancelled. " : "") + "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
             }
         case .apply:
+            markApplied(type, config: config)
             jobQueue.enqueue("Apply \(type.title) (\(files.count) files)") { reporter in
-                let r = IconBatch.apply(files, config: config, onProgress: reporter.progress)
-                return "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
+                let r = IconBatch.apply(files, config: config, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
+                return (r.interrupted ? "Cancelled. " : "") + "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
             }
         }
     }

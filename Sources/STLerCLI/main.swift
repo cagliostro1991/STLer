@@ -1,6 +1,6 @@
 import AppKit
 
-enum Command: String { case run, follow, reset, config, install, uninstall }
+enum Command: String { case run, follow, reset, config, install, uninstall, version, update }
 
 setvbuf(stdout, nil, _IOLBF, 0)
 var arguments = Array(CommandLine.arguments.dropFirst())
@@ -15,6 +15,8 @@ do {
     case .config: try configure(arguments)
     case .install: try LaunchAgent.install()
     case .uninstall: LaunchAgent.uninstall()
+    case .version: print("stler \(AppVersion.current)")
+    case .update: checkForUpdate()
     }
 } catch let error as CLIError {
     FileHandle.standardError.write(Data((error.message + "\n").utf8))

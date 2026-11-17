@@ -10,6 +10,10 @@ thumbnail extensions override it (tested: a `QLThumbnailProvider` for
 UTI). STLer renders each model offscreen with SceneKit and sets the result as the
 file's custom icon via `NSWorkspace.setIcon`.
 
+## Install
+
+Download the latest `STLer-<version>-macos.zip` from the Releases page, unpack it and move `STLer.app` to Applications. The build is ad-hoc signed and not notarized: the first time, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine /Applications/STLer.app`. The window checks GitHub for newer releases at most once a day (switch it off in General); `stler update` does the same from the terminal. Release notes template and steps: `docs/release-template.md`.
+
 ## Build
 
 ```

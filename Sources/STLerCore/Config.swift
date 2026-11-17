@@ -122,6 +122,8 @@ struct Config: Codable, Equatable {
     var followOpened = false
     /// With `followOpened`: the other models in the opened file's own folder (no subfolders, at most `FileScanner.siblingLimit`).
     var followOpenedFolder = false
+    /// The window looks for a newer release on GitHub when it opens (at most once a day). The Check button always works.
+    var checkUpdates = true
     /// Where the app's Clear and Apply buttons work: the listed folders, or the whole home folder.
     var scope = Scope.folder
     var scopeFolders: [String] = []
@@ -129,7 +131,7 @@ struct Config: Codable, Equatable {
     enum Scope: String, Codable { case folder, home }
 
     private enum CodingKeys: String, CodingKey {
-        case stl, threeMF = "3mf", step, followDepth, followOpened, followOpenedFolder, stepEngine, freecadPath, scope, scopeFolders
+        case stl, threeMF = "3mf", step, followDepth, checkUpdates, followOpened, followOpenedFolder, stepEngine, freecadPath, scope, scopeFolders
     }
 
     private enum LegacyKeys: String, CodingKey { case view, color, formats, badge, scopeFolder, firstPlateOnly }
@@ -182,6 +184,7 @@ struct Config: Codable, Equatable {
         step = read(.step, step)
         followDepth = read(.followDepth, followDepth)
         followOpened = read(.followOpened, followOpened)
+        checkUpdates = read(.checkUpdates, checkUpdates)
         followOpenedFolder = read(.followOpenedFolder, followOpenedFolder)
         stepEngine = read(.stepEngine, stepEngine)
         freecadPath = read(.freecadPath, freecadPath)
@@ -241,6 +244,9 @@ struct Config: Codable, Equatable {
         case "followOpened":
             guard let b = Bool(value) else { return "followOpened must be true or false" }
             followOpened = b
+        case "checkUpdates":
+            guard let b = Bool(value) else { return "checkUpdates must be true or false" }
+            checkUpdates = b
         case "followOpenedFolder":
             guard let b = Bool(value) else { return "followOpenedFolder must be true or false" }
             followOpenedFolder = b

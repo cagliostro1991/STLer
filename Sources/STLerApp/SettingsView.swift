@@ -181,6 +181,24 @@ struct SettingsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+            Section("About") {
+                LabeledContent("STLer") { Text(AppVersion.current).foregroundStyle(.secondary) }
+                HStack {
+                    Button("Check for updates") { model.checkForUpdate() }.disabled(model.checkingUpdate)
+                    if model.checkingUpdate { ProgressView().controlSize(.small) }
+                    switch model.update {
+                    case .upToDate?: Text("You have the latest version.").foregroundStyle(.secondary)
+                    case .available(let release)?:
+                        Link("Version \(release.tag) is available: open the download page", destination: release.url)
+                    case .failed(let message)?: Text(message).foregroundStyle(.orange)
+                    case nil: EmptyView()
+                    }
+                }
+                Toggle("Check for updates when the window opens", isOn: $model.config.checkUpdates)
+                Text("Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear { model.estimateHomeIfNeeded() }
@@ -233,23 +251,29 @@ struct SettingsView: View {
                     if type != .stl { limitPicker(type) }
                 }
                 labelSection(type)
-                Section("Actions") {
-                    HStack {
-                        Button("Clear...") { model.request(.clear, for: type) }
-                        Button("Apply") { model.request(.apply, for: type) }
-                            .buttonStyle(.borderedProminent)
-                        Spacer()
-                        Text(scopeDescription)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    .disabled(model.busy)
+                if !model.hasUnappliedChanges(type) {
+                    Section("Actions") { actionsPanel(type) }
                 }
             }
         }
         .formStyle(.grouped)
+        .overlay(alignment: .bottom) {
+            if model.hasUnappliedChanges(type) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("These settings are not applied to your files yet", systemImage: "circle.fill")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.orange)
+                    actionsPanel(type)
+                }
+                .padding(12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(.orange.opacity(0.4)))
+                .shadow(radius: 8, y: 2)
+                .padding(16)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: model.hasUnappliedChanges(type))
     }
 
     /// How much of the colours stored in the file shows instead of the single fill colour.
@@ -275,6 +299,22 @@ struct SettingsView: View {
             Text("All").tag(0)
             ForEach(choices + (current == 0 || choices.contains(current) ? [] : [current]), id: \.self) { Text("First \($0)").tag($0) }
         }
+    }
+
+    /// Clear and Apply with the place they work on. Sits in the form, and floats above it while changes are waiting.
+    private func actionsPanel(_ type: FileType) -> some View {
+        HStack {
+            Button("Clear...") { model.request(.clear, for: type) }
+            Button("Apply") { model.request(.apply, for: type) }
+                .buttonStyle(.borderedProminent)
+            Spacer()
+            Text(scopeDescription)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .disabled(model.busy)
     }
 
     private var freecadSection: some View {
@@ -497,6 +537,12 @@ struct SettingsView: View {
                 }
             }
             Spacer(minLength: 0)
+            if job.state != .done {
+                Button { model.cancel(job) } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help(job.state == .running ? "Cancel this job" : "Remove from the queue")
+            }
         }
         .padding(6)
         .background(job.state == .running ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
