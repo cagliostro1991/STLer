@@ -1,0 +1,9 @@
+* text=auto
+*.stl binary
+*.3mf binary
+*.step -diff
+*.png binary
+# Keep the bundled samples and the wiki sources out of the language statistics
+Sources/STLerApp/Resources/* linguist-generated
+docs/** linguist-documentation
+site/** linguist-documentation

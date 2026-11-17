@@ -4,7 +4,8 @@
 
 ## How I checked
 
-- [ ] `make test` passes
+- [ ] `make test` passes (CI runs it too)
+- [ ] The PR title is a conventional commit title (`fix: ...`, `feat(scope): ...`)
 - [ ] A bug fix comes with a test that fails without the fix (or an ADR that says why it cannot be tested)
 - [ ] I tried it on a copy of some models, not on my real folder (if it writes icons)
 - [ ] The settings window or `stler follow` changed and I checked it by hand: <!-- how -->

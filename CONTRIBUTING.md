@@ -17,12 +17,21 @@ make test
 
 Only the Command Line Tools are needed, no Xcode.
 
-## Pull requests
+## Pull requests, step by step
 
-- Conventional commit messages (`feat: ...`, `fix: ...`, `docs: ...`).
+1. Fork the repository and make a branch in your fork (`fix/short-name`, `feat/short-name`).
+2. `make test` passes before you start and before you push. CI runs the same on GitHub.
+3. Change one thing. Bug fix: add a test that fails without it. New decision or macOS surprise: an ADR or a note in `docs/knowledge/` in the same PR.
+4. Commit messages and the PR title in conventional style: `feat(follow): ...`, `fix(3mf): ...`, `docs: ...`. CI checks the title.
+5. Open the pull request, fill in the template (what, why, how you checked). Link the issue with "Fixes #123".
+6. CI has to be green, the maintainer reviews, you may be asked for changes. Pushing more commits to the branch updates the PR.
+7. The PR is squashed into one commit on `main`, with your name as author.
+
 - Say what you ran. "make test passes" is enough for small things. For anything that writes icons, mention that you tried it on a copy of some models, not your real folder.
 - Using an AI assistant is fine. You still own the result: read the diff, run the tests, and delete anything you cannot explain.
-- The settings window and the LaunchAgent are not covered by tests, so if you change them, say how you checked.
+- The settings window and the LaunchAgent are not covered by tests, so if you change them, say how you checked (a screenshot of the window, not of the whole screen).
+- By contributing you agree that your contribution is licensed under the project's [MIT license](LICENSE). No sign-off or CLA is needed.
+- Add yourself to `AUTHORS` in your first pull request if you like.
 
 ## Before you start
 
