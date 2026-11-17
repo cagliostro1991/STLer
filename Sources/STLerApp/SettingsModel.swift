@@ -45,6 +45,8 @@ final class SettingsModel: ObservableObject {
     /// Whether `stler follow` is installed as a LaunchAgent and running.
     @Published private(set) var agent = FollowAgent.State.notInstalled
     @Published var showAgentInfo = false
+    /// The first-launch explanation; shown once, and again from the help button in the header.
+    @Published var showWelcome = !UserDefaults.standard.bool(forKey: "welcomeShown")
     @Published var pending: Pending?
     /// Resolved `freecadcmd`, `nil` when FreeCAD cannot be found (STEP is then off and cannot be enabled).
     @Published private(set) var freecad: String?
@@ -72,6 +74,20 @@ final class SettingsModel: ObservableObject {
         refreshAgent()
         Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.refreshAgent() }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.refreshAgent() }
+    }
+
+    /// Empties the journal: finished entries (also those of `follow`) go, waiting jobs are cancelled, a running one stays.
+    func clearJournal() {
+        jobQueue.clear()
+        ActivityLog.clearFinished()
+        refreshJournal()
+    }
+
+    /// Closes the welcome sheet for good; with `setup` it also opens General, where `stler follow` is installed.
+    func dismissWelcome(setup: Bool) {
+        UserDefaults.standard.set(true, forKey: "welcomeShown")
+        showWelcome = false
+        if setup { page = .general }
     }
 
     func refreshAgent() {

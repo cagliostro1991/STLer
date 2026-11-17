@@ -44,6 +44,11 @@ enum IconBatch {
         return result
     }
 
+    /// The files that `apply` would render: their icon is missing or out of date.
+    static func pending(_ files: [String], config: Config) -> [String] {
+        files.filter { staleType(of: $0, config: config, force: false) != nil }
+    }
+
     /// `apply` for one folder, down to `config.followDepth`, top level first.
     static func applyToFolder(_ folder: String, config: Config, onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
         apply(FileScanner.scan([folder], formats: config.enabledFormats, maxDepth: config.maxDepth), config: config, onProgress: onProgress, shouldContinue: shouldContinue)

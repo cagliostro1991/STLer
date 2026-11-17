@@ -74,6 +74,20 @@ enum FileScanner {
         return counts
     }
 
+    /// Most files taken from the folder of an opened file, so one open never starts a long job.
+    static let siblingLimit = 50
+
+    /// The other models that lie directly in the folder of `file` (no subfolders), small ones first, at most `siblingLimit`.
+    static func siblings(of file: String, formats: [String]) -> [String] {
+        let folder = (file as NSString).deletingLastPathComponent
+        guard isUserFile(folder + "/x") else { return [] }
+        var allowed = Set(formats)
+        if allowed.contains("step") { allowed.insert("stp") }
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
+        let models = names.filter { !$0.hasPrefix(".") && allowed.contains(($0 as NSString).pathExtension.lowercased()) }.map { folder + "/" + $0 }
+        return Array(ordered(models, under: folder).prefix(siblingLimit))
+    }
+
     /// False for files inside hidden folders, `Library` and package-like folders (apps, bundles, photo libraries).
     static func isUserFile(_ path: String) -> Bool {
         let packageSuffixes = [".app", ".bundle", ".framework", ".photoslibrary"]

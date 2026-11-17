@@ -74,9 +74,15 @@ struct SettingsView: View {
                 footer
             }
             .navigationTitle(title)
-            .toolbar { ToolbarItem(placement: .primaryAction) { agentButton } }
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) { agentButton }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { model.showWelcome = true } label: { Image(systemName: "questionmark.circle") }.help("What is STLer?")
+                }
+            }
         }
         .frame(minWidth: 780, minHeight: 560)
+        .sheet(isPresented: $model.showWelcome) { welcome }
         .confirmationDialog(confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible, presenting: model.pending) { pending in
             Button(pending.action == .clear ? "Clear" : "Apply", role: pending.action == .clear ? .destructive : nil) { model.confirmPending() }
         } message: { pending in
@@ -131,6 +137,22 @@ struct SettingsView: View {
                     Text(homeSummary)
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                }
+            }
+            Section("When I open a file") {
+                Toggle("Give a file its icon when I open it", isOn: $model.config.followOpened)
+                Text("Works wherever the file is: in any folder, or on a connected drive such as a flash drive, even when no Finder window shows it. The icon appears a few seconds after you open the file. It needs stler follow to be running (see below), and it only sees places that Spotlight indexes.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Toggle("Also the other models in its folder", isOn: $model.config.followOpenedFolder)
+                    .disabled(!model.config.followOpened)
+                Text("After the file itself, the other STL, 3MF and STEP files that lie in the same folder get icons too. Only that one folder is used, subfolders are left alone, and at most \(FileScanner.siblingLimit) files at a time, so opening one file never starts a long job.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                if model.config.followOpened, model.agent != .running {
+                    Label("stler follow is not running, so nothing happens yet.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
                 }
             }
             Section("Follow Finder") {
@@ -337,6 +359,40 @@ struct SettingsView: View {
         }
     }
 
+    private func welcomeBlock(_ symbol: String, _ title: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol).font(.title2).foregroundStyle(Color.accentColor).frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.headline)
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Shown on the first launch: what the app is, why it works the way it does, why there is a command line tool.
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Welcome to STLer").font(.title.bold())
+            welcomeBlock("cube.transparent", "What it does",
+                "macOS shows STL, 3MF and STEP files with a plain generic icon. STLer draws a small picture of the model itself and sets it as the file's icon in Finder, so you see what is inside before you open it.")
+            welcomeBlock("paintbrush", "How it works",
+                "The model is rendered off-screen from the angle and in the colour you choose for each file type here. The picture is stored as the file's own custom icon. The file's contents and modification date stay as they were, and Clear removes the icons again.")
+            welcomeBlock("photo.on.rectangle", "Why icons and not previews",
+                "macOS has its own thumbnail for STL files and an app cannot replace it. Setting a custom icon on each file is the only way to change what Finder shows.")
+            welcomeBlock("terminal", "Why there is a command line tool",
+                "Apply in this window only covers the files that exist right now. Files that arrive later, such as a download, a folder you open in Finder or a file you open from a flash drive, need something that keeps watching in the background, also when this window is closed. That is stler, a small command line program. Install puts a copy in ~/.local/bin and macOS starts it at login. The first time it asks for permission to see which folder Finder shows.")
+            HStack {
+                Spacer()
+                Button("Not now") { model.dismissWelcome(setup: false) }
+                Button("Set up stler follow") { model.dismissWelcome(setup: true) }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 560)
+    }
+
     private static let followExplanation = "stler follow is a small background helper. When you open a folder in Finder it gives new and changed STL, 3MF and STEP files their icons right away, so you do not have to press Apply. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
 
     private var followStatusText: String {
@@ -389,6 +445,23 @@ struct SettingsView: View {
 
     /// One stream, oldest at the top: finished, the running job (highlighted), then the queued ones.
     private var journalPanel: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Journal").font(.headline)
+                Spacer()
+                Button("Clear") { model.clearJournal() }
+                    .controlSize(.small)
+                    .disabled(!model.journal.contains { $0.state != .running })
+                    .help("Removes finished entries and cancels waiting jobs")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Divider()
+            journalList
+        }
+    }
+
+    private var journalList: some View {
         ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
@@ -399,7 +472,7 @@ struct SettingsView: View {
                 }
                 .padding(8)
             }
-            .frame(width: 460, height: 320)
+            .frame(width: 460, height: 300)
             .onChange(of: model.journal) { journal in
                 if let target = journal.first(where: { $0.state == .running }) ?? journal.last { reader.scrollTo(target.id) }
             }

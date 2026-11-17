@@ -45,6 +45,7 @@ final class JobQueue {
         change { $0.append(job) }
         group.enter()
         worker.async {
+            guard self.jobs.contains(where: { $0.id == job.id }) else { self.group.leave(); return }
             self.update(job.id) { $0.state = .running }
             let summary = work(Reporter(progress: { done, total, file in
                 self.update(job.id) { $0.done = done; $0.total = total; $0.current = file }
@@ -57,6 +58,9 @@ final class JobQueue {
             self.group.leave()
         }
     }
+
+    /// Removes the finished jobs and cancels the ones still waiting; the running job is left alone.
+    func clear() { change { $0.removeAll { $0.state != .running } } }
 
     /// Blocks until nothing is queued or running. For tests.
     func waitUntilIdle() { group.wait() }

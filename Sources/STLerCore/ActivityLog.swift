@@ -32,6 +32,12 @@ enum ActivityLog {
         }
     }
 
+    /// Drops one entry, for a scan that turned out to have nothing to do.
+    static func remove(_ id: UUID) { modify { $0.removeAll { $0.id == id } } }
+
+    /// Drops everything that has finished; a run in progress stays.
+    static func clearFinished() { modify { $0.removeAll { !$0.running } } }
+
     /// Entries as journal jobs, oldest first.
     static func jobs() -> [Job] {
         modify { _ in }.map { entry in

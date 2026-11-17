@@ -14,7 +14,7 @@ usage:
   stler reset <folder|file>... remove icons set by stler
   stler config get [key] | set <key> <value>
 views: iso front back left right top bottom
-keys:  followDepth stepEngine (freecad|opencascade) freecadPath scope scopeFolders (comma list)
+keys:  followDepth followOpened followOpenedFolder stepEngine (freecad|opencascade) freecadPath scope scopeFolders (comma list)
        <type>.enabled <type>.view <type>.projection <type>.color
        <type>.label.corner|textColor|backgroundColor|cornerRadius|opacity     (type: stl, 3mf, step)
 run flags change every enabled type for this run only; without paths run uses the folder open in Finder (fallback: cwd).
@@ -127,33 +127,69 @@ func follow() -> Never {
         unavailable = folder == nil
         while let current = folder, state.shouldScan(current, modified: FollowState.modificationDate(of: current)) {
             var lastCheck = Date()
-            var entry: ActivityLog.Entry?
+            var entry = ActivityLog.Entry(title: "Finder: \((current as NSString).abbreviatingWithTildeInPath)", running: true)
+            var published = false
+            let started = Date()
             var lastWrite = Date.distantPast
             let result = IconBatch.applyToFolder(current, config: Config.load(), onProgress: { done, total, file in
-                var shown = entry ?? ActivityLog.Entry(title: "Finder: \((current as NSString).abbreviatingWithTildeInPath)", running: true)
-                shown.done = done; shown.total = total; shown.current = file
-                entry = shown
-                guard Date().timeIntervalSince(lastWrite) > 1 || done == 1 else { return }
+                entry.done = done; entry.total = total; entry.current = file
+                // A scan that finds nothing to do ends within a second and is not worth a journal line.
+                guard Date().timeIntervalSince(started) > 1, Date().timeIntervalSince(lastWrite) > 1 else { return }
                 lastWrite = Date()
-                ActivityLog.upsert(shown)
+                published = true
+                ActivityLog.upsert(entry)
             }, shouldContinue: {
                 guard Date().timeIntervalSince(lastCheck) > 1.5 else { return true }
                 lastCheck = Date()
                 let front = FinderFolder.front()
                 return front == nil || front == current
             })
-            if var finished = entry {
-                finished.running = false
-                finished.current = ""
-                finished.summary = summary(result) + (result.interrupted ? " (interrupted, another folder opened)" : "")
-                ActivityLog.upsert(finished)
+            if result.rendered > 0 || result.failed > 0 {
+                entry.running = false
+                entry.current = ""
+                entry.summary = summary(result) + (result.interrupted ? " (interrupted, another folder opened)" : "")
+                ActivityLog.upsert(entry)
+            } else if published {
+                ActivityLog.remove(entry.id)
             }
+            if result.interrupted { state.forget(current) }
             print("\(current): \(summary(result))\(result.interrupted ? " (interrupted, another folder opened)" : "")")
             folder = result.interrupted ? FinderFolder.front() : nil
         }
     }
+    let watcher = OpenedFileWatcher()
+    func openedFiles(_ paths: [String]) {
+        let config = Config.load()
+        let opened = OpenedFileWatcher.relevant(paths, config: config)
+        var files = opened
+        if config.followOpenedFolder {
+            // The opened files come first, then their neighbours; `pending` keeps only what needs a new icon.
+            files += Set(opened.map { ($0 as NSString).deletingLastPathComponent }).sorted().flatMap { FileScanner.siblings(of: $0 + "/x", formats: config.enabledFormats) }
+        }
+        var seen = Set<String>()
+        files = IconBatch.pending(files.filter { seen.insert($0).inserted }, config: config)
+        guard !files.isEmpty else { return }
+        let title = files.count == 1 ? "Opened: \((files[0] as NSString).lastPathComponent)" : "Opened: \(files.count) files"
+        var entry = ActivityLog.Entry(title: title, running: true, done: 0, total: files.count)
+        ActivityLog.upsert(entry)
+        let result = IconBatch.apply(files, config: config)
+        entry.running = false
+        entry.done = files.count
+        entry.summary = summary(result)
+        ActivityLog.upsert(entry)
+        print("\(title): \(summary(result))")
+    }
+    func syncWatcher() {
+        let config = Config.load()
+        if config.followOpened, !watcher.isRunning {
+            watcher.start(extensions: FileType.allCases.flatMap(\.extensions), onOpened: openedFiles)
+        } else if !config.followOpened, watcher.isRunning {
+            watcher.stop()
+        }
+    }
     tick()
-    Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in tick() }
+    syncWatcher()
+    Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in tick(); syncWatcher() }
     RunLoop.main.run()
     exit(0)
 }

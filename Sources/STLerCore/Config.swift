@@ -118,6 +118,10 @@ struct Config: Codable, Equatable {
     var stepEngine = StepEngine.freecad
     /// `freecadcmd` location for the FreeCAD engine; empty means the usual install locations.
     var freecadPath = ""
+    /// `follow` also renders a file the moment it is opened anywhere (any folder, indexed drives), not only the open Finder folder.
+    var followOpened = false
+    /// With `followOpened`: the other models in the opened file's own folder (no subfolders, at most `FileScanner.siblingLimit`).
+    var followOpenedFolder = false
     /// Where the app's Clear and Apply buttons work: the listed folders, or the whole home folder.
     var scope = Scope.folder
     var scopeFolders: [String] = []
@@ -125,7 +129,7 @@ struct Config: Codable, Equatable {
     enum Scope: String, Codable { case folder, home }
 
     private enum CodingKeys: String, CodingKey {
-        case stl, threeMF = "3mf", step, followDepth, stepEngine, freecadPath, scope, scopeFolders
+        case stl, threeMF = "3mf", step, followDepth, followOpened, followOpenedFolder, stepEngine, freecadPath, scope, scopeFolders
     }
 
     private enum LegacyKeys: String, CodingKey { case view, color, formats, badge, scopeFolder, firstPlateOnly }
@@ -177,6 +181,8 @@ struct Config: Codable, Equatable {
         threeMF = read(.threeMF, threeMF)
         step = read(.step, step)
         followDepth = read(.followDepth, followDepth)
+        followOpened = read(.followOpened, followOpened)
+        followOpenedFolder = read(.followOpenedFolder, followOpenedFolder)
         stepEngine = read(.stepEngine, stepEngine)
         freecadPath = read(.freecadPath, freecadPath)
         if let firstPlateOnly = (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Bool.self, forKey: .firstPlateOnly)) ?? nil {
@@ -232,6 +238,12 @@ struct Config: Codable, Equatable {
         case "followDepth":
             guard value == "deep" || (Int(value) ?? 0) >= 1 else { return "followDepth must be 1, 2, 3... or `deep` (unlimited)" }
             followDepth = Int(value) ?? 0
+        case "followOpened":
+            guard let b = Bool(value) else { return "followOpened must be true or false" }
+            followOpened = b
+        case "followOpenedFolder":
+            guard let b = Bool(value) else { return "followOpenedFolder must be true or false" }
+            followOpenedFolder = b
         case "stepEngine":
             guard let engine = StepEngine(rawValue: value) else { return "stepEngine must be freecad or opencascade" }
             stepEngine = engine

@@ -87,6 +87,9 @@ ActivityLog.upsert(running)
 check(ActivityLog.jobs().count == 1 && ActivityLog.jobs().first?.state == .done && ActivityLog.jobs().first?.id == running.id, "finishing an entry replaces it instead of adding another")
 for index in 0..<14 { ActivityLog.upsert(ActivityLog.Entry(title: "f\(index)", running: false)) }
 check(ActivityLog.jobs().count == JobQueue.keepFinished && ActivityLog.jobs().last?.title == "f13", "the shared log keeps only the last 10 finished entries")
+ActivityLog.upsert(ActivityLog.Entry(title: "busy", running: true))
+ActivityLog.clearFinished()
+check(ActivityLog.jobs().map(\.title) == ["busy"], "clearing the shared log keeps a run in progress")
 try? "not json".write(to: logDirectory.appendingPathComponent("activity.json"), atomically: true, encoding: .utf8)
 check(ActivityLog.jobs().isEmpty, "a broken log file reads as empty")
 unsetenv("STLER_LOG")
@@ -295,7 +298,9 @@ let morning = Date(timeIntervalSince1970: 1_000_000)
 check(followState.shouldScan("/a", modified: morning), "follow scans a folder when it comes to the front")
 check(!followState.shouldScan("/a", modified: morning), "follow leaves an unchanged folder alone")
 check(followState.shouldScan("/a", modified: morning.addingTimeInterval(5)), "follow scans the same folder again when a file was added (its date changed)")
-check(followState.shouldScan("/b", modified: morning.addingTimeInterval(5)) && followState.shouldScan("/a", modified: morning.addingTimeInterval(5)), "follow scans again when another folder comes to the front and back")
+check(followState.shouldScan("/b", modified: morning) && !followState.shouldScan("/a", modified: morning.addingTimeInterval(5)) && !followState.shouldScan("/b", modified: morning), "switching between two unchanged folders does not rescan them over and over")
+followState.forget("/b")
+check(followState.shouldScan("/b", modified: morning) && followState.shouldScan("/c", modified: nil) && followState.shouldScan("/c", modified: nil), "a cut short scan is repeated, and a folder with an unknown date is always scanned")
 let watched = tmp.appendingPathComponent("watched")
 try FileManager.default.createDirectory(at: watched, withIntermediateDirectories: true)
 let dateBefore = FollowState.modificationDate(of: watched.path)
@@ -320,6 +325,44 @@ try String(repeating: "x", count: 5000).write(to: bigFile, atomically: true, enc
 try "x".write(to: smallFile, atomically: true, encoding: .utf8)
 try "x".write(to: deepFile, atomically: true, encoding: .utf8)
 check(FileScanner.ordered([deepFile.path, bigFile.path, smallFile.path], under: orderDir.path) == [smallFile.path, bigFile.path, deepFile.path], "a huge model does not hold up the small ones of the same level, and the top level still comes first")
+var openedFlag = Config()
+check(openedFlag.followOpened == false && openedFlag.set("followOpened", "maybe") != nil && openedFlag.set("followOpened", "true") == nil && openedFlag.followOpened, "opening files anywhere is off by default and validated")
+let openedDir = tmp.appendingPathComponent("opened")
+try FileManager.default.createDirectory(at: openedDir.appendingPathComponent(".hidden"), withIntermediateDirectories: true)
+let openedFile = openedDir.appendingPathComponent("a.stl").path, hiddenFile = openedDir.appendingPathComponent(".hidden/b.stl").path
+try "x".write(toFile: openedFile, atomically: true, encoding: .utf8)
+try "x".write(toFile: hiddenFile, atomically: true, encoding: .utf8)
+var openedConfig = Config()
+check(OpenedFileWatcher.relevant([openedFile, hiddenFile, "/nonexistent/c.stl", "/tmp/d.txt"], config: openedConfig) == [openedFile], "an opened file is only worth an icon when it exists, is a model, is not hidden")
+openedConfig.stl.enabled = false
+check(OpenedFileWatcher.relevant([openedFile], config: openedConfig).isEmpty, "an opened file of a disabled type is ignored")
+let clearQueue = JobQueue()
+let clearGate = DispatchSemaphore(value: 0)
+var clearRan: [String] = []
+let clearLock = NSLock()
+for name in ["running", "waiting 1", "waiting 2"] {
+    clearQueue.enqueue(name) { _ in
+        if name == "running" { clearGate.wait() }
+        clearLock.lock(); clearRan.append(name); clearLock.unlock()
+        return "ok"
+    }
+}
+Thread.sleep(forTimeInterval: 0.2)
+clearQueue.clear()
+check(clearQueue.jobs.map(\.title) == ["running"], "clearing the journal keeps only the running job")
+clearGate.signal()
+clearQueue.waitUntilIdle()
+check(clearRan == ["running"] && clearQueue.jobs.map(\.title) == ["running"], "cancelled waiting jobs never run")
+let siblingsDir = tmp.appendingPathComponent("siblings")
+try FileManager.default.createDirectory(at: siblingsDir.appendingPathComponent("inner"), withIntermediateDirectories: true)
+for name in ["a.stl", "b.3mf", "c.step", "d.txt", ".hidden.stl", "inner/e.stl"] { try "x".write(to: siblingsDir.appendingPathComponent(name), atomically: true, encoding: .utf8) }
+let siblingNames = FileScanner.siblings(of: siblingsDir.appendingPathComponent("a.stl").path, formats: ["stl", "3mf", "step"]).map { ($0 as NSString).lastPathComponent }
+check(Set(siblingNames) == ["a.stl", "b.3mf", "c.step"], "siblings are the models of that one folder: no subfolders, hidden or other files")
+check(FileScanner.siblings(of: siblingsDir.appendingPathComponent("a.stl").path, formats: ["stl"]).count == 1, "siblings respect the enabled formats")
+for index in 0..<60 { try "x".write(to: siblingsDir.appendingPathComponent("many\(index).stl"), atomically: true, encoding: .utf8) }
+check(FileScanner.siblings(of: siblingsDir.appendingPathComponent("a.stl").path, formats: ["stl"]).count == FileScanner.siblingLimit, "siblings are capped so one open never starts a long job")
+var folderFlag = Config()
+check(!folderFlag.followOpenedFolder && folderFlag.set("followOpenedFolder", "yes") != nil && folderFlag.set("followOpenedFolder", "true") == nil && folderFlag.followOpenedFolder, "the opened-folder option is off by default and validated")
 func tintedPixels(_ image: NSImage?) -> (red: Int, blue: Int) {
     guard let tiff = image?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return (0, 0) }
     var counts = (red: 0, blue: 0)
