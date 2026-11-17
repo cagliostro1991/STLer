@@ -1,0 +1,6 @@
+---
+description: STLer project rules
+alwaysApply: true
+---
+
+Follow `AGENTS.md` in the repo root: layout, code style, build and test commands, and the traps already hit. Run `make test` before and after changes, write icons only through `IconBatch`, never test on real user files or the real config (use `STLER_CONFIG`), and ask before pushing, publishing or installing the LaunchAgent.
