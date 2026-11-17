@@ -18,7 +18,16 @@
 ## Change anything that writes icons
 Go through `IconBatch`. Run `make test`, then the mutation check from `testing-safely.md`.
 
+## Git identity (do this in every new clone)
+Commit history is public, and so is the e-mail in it. This repository uses the GitHub no-reply address, set per repository (not globally):
+```
+git config user.name "Pavlo Zubenko"
+git config user.email "cagliostro1991@users.noreply.github.com"
+git log --format='%ae' | sort -u     # must print only the no-reply address
+```
+
 ## Release / publish
+**Version:** bump it in two places that a self-check keeps equal: `VERSION` and `AppVersion.current` in `Sources/STLerCore/Version.swift`. Then `CHANGELOG.md`, the notes in `docs/releases/`, a `vX.Y.Z[-beta.N]` tag, and `Scripts/release.sh`. The in-app update check reads GitHub releases, so a version that is not released there is never offered.
 A full recipe with a notes template is in `docs/release-template.md`; `Scripts/release.sh` builds the archive.
 
 1. `make test && make build` on a clean checkout.

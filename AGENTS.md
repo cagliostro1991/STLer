@@ -55,6 +55,11 @@ Details and fixes are in `docs/knowledge/macos-gotchas.md`. The short list:
 - Recipes for a new setting, a new format and a release are in `docs/knowledge/workflow.md`.
 - The maintainer reads commit messages before they go in, so propose the message first.
 
+## Identity and versions
+
+- Commits use the no-reply e-mail `cagliostro1991@users.noreply.github.com`, set per repository (`docs/knowledge/workflow.md`). Check `git config user.email` before the first commit in a fresh clone.
+- A release bumps `VERSION` and `AppVersion.current` together (the self-check fails if they differ), plus `CHANGELOG.md`.
+
 ## Ask first
 
 Anything that leaves the machine or sticks around: pushing, publishing, changing repo visibility, installing the LaunchAgent (`stler install`), killing processes you did not start. Everything else, just do it.
