@@ -13,5 +13,7 @@ Last updated 2026-11-17.
 
 ## Maybe
 - Notarised app build (needs a paid Apple Developer account).
-- OpenCASCADE helper as a lighter STEP backend than FreeCAD.
+- Try OpenCASCADE on more STEP files (assemblies, huge models); verified so far on one real assembly.
 - F3D: only Fusion's embedded `Previews/small.png` is readable, see ADR 0009.
+- Model colours for STEP (needs a colour-aware reader and a coloured mesh format), and Bambu per-triangle paint for 3MF (ADR 0017).
+- Pick the biggest STEP parts instead of the first ones (ADR 0016).

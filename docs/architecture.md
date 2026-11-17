@@ -33,7 +33,10 @@
 | `IconRenderer` | Model file to `NSImage`: material, orthographic or perspective camera, side light, then the format label (colours, radius, opacity) |
 | `FlatGeometry` | Triangle soup with one normal per triangle; shared by the STL and 3MF paths |
 | `ThreeMFLoader` | 3MF package to one SceneKit node (components, transforms, `p:path`, first plate) |
-| `StepConverter` | STEP to cached STL through `freecadcmd` |
+| `StepConverter` | STEP to cached STL through the chosen engine (`freecadcmd` or the OpenCASCADE helper) |
+| `JobQueue` | one-at-a-time background jobs with progress; the window's Apply and Clear are jobs |
+| `ActivityLog` | JSON log shared by `stler follow` and the window, last 10 finished entries |
+| `OpenCascade` | Homebrew lookup, Install via Terminal, compiles the `stler-step` helper |
 | `Signature` | `dev.stler.sig` xattr: which settings of the file's type produced the current icon |
 | `IconBatch` | Apply / reset icons; the only place that writes icons |
 | `stler` CLI | Flag parsing and commands; the only place that prints |

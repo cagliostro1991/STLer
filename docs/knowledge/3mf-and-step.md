@@ -11,7 +11,8 @@
 
 ## STEP
 - B-rep: needs a CAD kernel to tessellate. We use FreeCAD's `freecadcmd` with `Part.read` and `MeshPart.meshFromShape` (deflection about 0.1 % of the bounding diagonal), writing STL.
-- One FreeCAD run per batch; start-up dominates. Cache key = path + mtime + size (FNV-1a, not `hashValue`).
+- Alternative engine: OpenCASCADE through a compiled helper, see ADR 0013. `Config.stepEngine` picks one.
+- One engine run per batch; start-up dominates. Cache key = path + mtime + size (FNV-1a, not `hashValue`).
 - `.stp` is the same format; treat both extensions as `step`.
 
 ## F3D

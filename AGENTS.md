@@ -48,6 +48,7 @@ Details and fixes are in `docs/knowledge/macos-gotchas.md`. The short list:
 ## Changing things
 
 - One thing per commit, conventional style: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
+- Every bug fix comes with at least one test that fails without the fix. If the bug lives where tests cannot reach (the SwiftUI window), pull the logic into `STLerCore` so it can be tested, or, when that is not possible, write an ADR that says why it is untested and mark its status `open, needs refactoring`. It is not a great decision, but it is an honest one, and the ADR is the debt ledger.
 - Run `make test` before and after. If you touch the icon writing code, check that the mtime tests still fail when the date restore is disabled (recipe in `docs/knowledge/testing-safely.md`).
 - A new decision gets an ADR (copy `docs/adr/0000-template.md`), a new gotcha gets a note in `docs/knowledge/`. Put them in the same change, so the next person does not find out the hard way.
 - Recipes for a new setting, a new format and a release are in `docs/knowledge/workflow.md`.

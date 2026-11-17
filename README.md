@@ -21,7 +21,7 @@ Only the Command Line Tools are required; the app is ad-hoc signed. `swift build
 
 ## Settings window
 
-`STLer.app` looks like System Settings: a sidebar with General, STL, 3MF and STEP (each type's tile has the type's colour and turns gray when the type is off). Each file type page has its own switch, view (isometric, front, back, left, right, top, bottom), projection (orthographic or perspective), colour and format label (position, text colour, background colour, corner radius, opacity), plus Clear and Apply buttons. General holds the scope the buttons work on (any number of chosen folders, or your home folder with a confirmation that shows the file count) and how deep `follow` goes. The preview on every page is 3DBenchy rendered with that page's settings.
+`STLer.app` looks like System Settings: a sidebar with General, STL, 3MF and STEP (each type's tile has the type's colour and turns gray when the type is off). Each file type page has its own switch, view (isometric, front, back, left, right, top, bottom), projection (orthographic or perspective), colour and format label (position, text colour, background colour, corner radius, opacity), plus Clear and Apply buttons. Both run as queued background jobs: the window never blocks, and the journal (icon at the bottom) shows finished, running and waiting jobs in one stream together with what `stler follow` did. General holds the scope the buttons work on (any number of chosen folders, or your home folder with a confirmation that shows the file count) and how deep `follow` goes. The preview on every page is 3DBenchy rendered with that page's settings.
 
 ## CLI
 
@@ -45,7 +45,7 @@ stler config get [key] | set <key> <value>
 
 | key | values | default |
 | --- | --- | --- |
-| `<type>.enabled` | `stl`, `3mf`, `step` switch (`step` needs FreeCAD) | stl, 3mf on; step off |
+| `<type>.enabled` | `stl`, `3mf`, `step` switch (`step` needs its engine) | stl, 3mf on; step off |
 | `<type>.view` | `iso`, `front`, `back`, `left`, `right`, `top`, `bottom` | `iso` |
 | `<type>.projection` | `orthographic`, `perspective` | `orthographic` |
 | `<type>.color` | `system` (system gray) or `#RRGGBB` | per type: STL `#4f8ff7`, 3MF `#f59e42`, STEP `#a66cf0` |
@@ -54,15 +54,17 @@ stler config get [key] | set <key> <value>
 | `<type>.label.backgroundColor` | `#RRGGBB` | `#262626` |
 | `<type>.label.cornerRadius` | 0 to 50, percent of the label height (50 = pill) | `50` |
 | `<type>.label.opacity` | 0 to 1, background and text together | `0.85` |
-| `firstPlateOnly` | bool, 3MF projects with several plates | `true` |
+| `<type>.modelColors` | `3mf`: 0 to 100, how much of the colours stored in the file replaces the fill colour (materials, Bambu/Orca filaments) | `0` |
+| `<type>.limit` | `3mf`: how many plates of a multi-plate project to show; `step`: how many parts of an assembly (file order); `1`, `2`... or `all` | 3mf `1`, step `all` |
 | `followDepth` | `1` (open folder only), `2`, `3`..., `0` = unlimited (`deep` in the CLI) | `3` |
+| `stepEngine` | `freecad` or `opencascade`, only one is used | freecad |
 | `freecadPath` | path to `freecadcmd`; empty = look in the usual places (`/Applications`, `~/Applications`, Homebrew) | empty |
 | `scope`, `scopeFolders` | where the window's Clear and Apply work: `folder` with a list of folders (any number), or `home` | `folder`, empty list |
 
 ## Formats
 
 - STL (via ModelIO)
-- STEP/STP (optional): converted to a cached STL with FreeCAD's headless `freecadcmd`, one FreeCAD run per batch; the cache lives in `~/Library/Caches/stler`. Off by default and impossible to switch on while FreeCAD cannot be found: the STEP page of the settings window searches for it (usual places, then Spotlight), lets you choose it by hand, and keeps the type off without it.
+- STEP/STP (optional): converted to a cached STL with FreeCAD's headless `freecadcmd`, one FreeCAD run per batch; the cache lives in `~/Library/Caches/stler`. Alternatively the OpenCASCADE library (`brew install opencascade`, 45 MB download, 160 MB on disk, instead of 2 GB) through a small helper that is compiled on first use. The STEP page switches between the two engines (never both). It is off by default and impossible to switch on while the chosen engine is missing: for FreeCAD the page searches for it (usual places, then Spotlight) or lets you choose it by hand, for OpenCASCADE it has an Install button that opens Terminal with the `brew install`.
 - 3MF: core spec, `components` with transforms, production-extension `p:path`
   (Bambu Studio, Orca, Prusa, Fusion). Only the first plate of a Bambu/Orca
   project is rendered; `support` objects are skipped.

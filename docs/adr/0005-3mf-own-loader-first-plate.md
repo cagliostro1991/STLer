@@ -15,4 +15,4 @@ Parse 3MF ourselves: `bsdtar` for archive access (`unzip` mangles non-ASCII memb
 
 - Depends on `/usr/bin/bsdtar` (ships with macOS).
 - Units and materials are ignored (the render is normalised and single-coloured).
-- Whole-plate previews of multi-plate files are available with `firstPlateOnly=false`.
+- Superseded in part by ADR 0016: the first-plate flag became a plate count (`3mf.limit`).
