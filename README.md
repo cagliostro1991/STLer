@@ -14,56 +14,62 @@ file's custom icon via `NSWorkspace.setIcon`.
 
 ```
 make build   # build/stler and build/STLer.app
-make test    # about 50 checks, no Xcode needed
+make test    # about 80 checks, no Xcode needed
 ```
 
 Only the Command Line Tools are required; the app is ad-hoc signed. `swift build` is not supported (see `docs/adr/0004-swiftc-and-make-no-xcode.md`).
 
+## Settings window
+
+`STLer.app` looks like System Settings: a sidebar with General, STL, 3MF and STEP (each type's tile has the type's colour and turns gray when the type is off). Each file type page has its own switch, view (isometric, front, back, left, right, top, bottom), projection (orthographic or perspective), colour and format label (position, text colour, background colour, corner radius, opacity), plus Clear and Apply buttons. General holds the scope the buttons work on (any number of chosen folders, or your home folder with a confirmation that shows the file count) and how deep `follow` goes. The preview on every page is 3DBenchy rendered with that page's settings.
+
 ## CLI
 
 ```
-stler [run] [--view V] [--color system|#RRGGBB] [--force|--no-force] [--depth N|deep]
-       [--badge off|topLeft|topRight|bottomLeft|bottomRight] [--dry-run] [<folder|file>...]
+stler [run] [--view V] [--projection orthographic|perspective] [--color system|#RRGGBB]
+      [--label off|topLeft|topRight|bottomLeft|bottomRight] [--depth N|deep] [--force] [--dry-run] [<folder|file>...]
 stler follow
 stler install | uninstall
-stler reset [--all] [<folder|file>...]
+stler reset <folder|file>...
 stler config get [key] | set <key> <value>
 ```
 
-- `run` without paths uses the folder open in Finder (fallback: cwd), then `watch` from the config.
-- `follow` polls the front Finder window and renders each newly opened folder down to `followDepth`.
+- `run` without paths uses the folder open in Finder (fallback: cwd). View flags change every enabled type for that run only.
+- `follow` polls the front Finder window and renders each newly opened folder down to `followDepth`; a long run gives way when you open another folder.
 - `install` copies the binary to `~/.local/bin/stler` and registers a LaunchAgent that keeps `follow` running at login; `uninstall` removes the agent.
-- Files already rendered with the same settings are skipped (signature in the `dev.stler.sig` xattr). `reset` removes only icons that carry that signature, never icons you set yourself.
+- Files already rendered with the same settings are skipped (signature in the `dev.stler.sig` xattr, one per type). `reset` removes only icons that carry that signature, never icons you set yourself.
 
 ## Config
 
-`~/.config/stler/config.json`, written by the settings window and by `stler config set`.
+`~/.config/stler/config.json`, written by the settings window and by `stler config set`. Settings are per file type; older files with global `view`, `color`, `formats` and `badge` keys are migrated when read.
 
 | key | values | default |
 | --- | --- | --- |
-| `view` | `iso`, `front`, `back`, `left`, `right`, `top`, `bottom` | `iso` |
-| `color` | `system` (system gray) or `#RRGGBB` | `system` |
-| `formats` | list of `stl`, `3mf`, `step` (`step` needs FreeCAD) | `stl`, `3mf` |
+| `<type>.enabled` | `stl`, `3mf`, `step` switch (`step` needs FreeCAD) | stl, 3mf on; step off |
+| `<type>.view` | `iso`, `front`, `back`, `left`, `right`, `top`, `bottom` | `iso` |
+| `<type>.projection` | `orthographic`, `perspective` | `orthographic` |
+| `<type>.color` | `system` (system gray) or `#RRGGBB` | per type: STL `#4f8ff7`, 3MF `#f59e42`, STEP `#a66cf0` |
+| `<type>.label.corner` | `off` or the corner of the format label | `bottomRight` |
+| `<type>.label.textColor` | `#RRGGBB` | `#ffffff` |
+| `<type>.label.backgroundColor` | `#RRGGBB` | `#262626` |
+| `<type>.label.cornerRadius` | 0 to 50, percent of the label height (50 = pill) | `50` |
+| `<type>.label.opacity` | 0 to 1, background and text together | `0.85` |
 | `firstPlateOnly` | bool, 3MF projects with several plates | `true` |
-| `force` | bool, re-render even if up to date | `false` |
 | `followDepth` | `1` (open folder only), `2`, `3`..., `0` = unlimited (`deep` in the CLI) | `3` |
-| `freecadPath` | path to `freecadcmd`, empty = `/Applications/FreeCAD.app/...` | empty |
-| `badge` | `off` or the corner of the format label | `bottomRight` |
-| `watch` | folders used by `reset --all` | empty |
-
-CLI flags override the config for one run.
+| `freecadPath` | path to `freecadcmd`; empty = look in the usual places (`/Applications`, `~/Applications`, Homebrew) | empty |
+| `scope`, `scopeFolders` | where the window's Clear and Apply work: `folder` with a list of folders (any number), or `home` | `folder`, empty list |
 
 ## Formats
 
 - STL (via ModelIO)
-- STEP/STP (optional): converted to a cached STL with FreeCAD's headless `freecadcmd`, one FreeCAD run per batch; the cache lives in `~/Library/Caches/stler`. Off by default, skipped with a message when FreeCAD is missing.
+- STEP/STP (optional): converted to a cached STL with FreeCAD's headless `freecadcmd`, one FreeCAD run per batch; the cache lives in `~/Library/Caches/stler`. Off by default and impossible to switch on while FreeCAD cannot be found: the STEP page of the settings window searches for it (usual places, then Spotlight), lets you choose it by hand, and keeps the type off without it.
 - 3MF: core spec, `components` with transforms, production-extension `p:path`
   (Bambu Studio, Orca, Prusa, Fusion). Only the first plate of a Bambu/Orca
   project is rendered; `support` objects are skipped.
 
 ## Tests
 
-`make test` compiles the core with `Tests/SelfCheck/main.swift` and runs the checks on temp files: config validation, folder depth, 3MF transforms and first-plate filtering, signature, and an end-to-end render/skip/reset run that also asserts the file's modification date survives. `STLER_CONFIG=/some/file.json` keeps experiments away from your real config.
+`make test` compiles the core with `Tests/SelfCheck/main.swift` and runs the checks on temp files: config validation and migration, folder depth, 3MF transforms and first-plate filtering, per-type signatures, orientation, label and projection checked on rendered pixels, and an end-to-end render/skip/reset run that also asserts the file's modification date survives. `STLER_CONFIG=/some/file.json` keeps experiments away from your real config.
 
 ## Documentation
 

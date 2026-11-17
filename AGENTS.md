@@ -10,7 +10,7 @@ A small macOS tool that renders isometric icons for `.stl`, `.3mf` and `.step` f
 
 ```
 make build   # build/stler (CLI) and build/STLer.app (settings window)
-make test    # about 50 checks, a few seconds
+make test    # about 80 checks, a few seconds
 ```
 
 You only need the Command Line Tools. Tests use temp files and a temp config, they never touch your files.
@@ -31,9 +31,9 @@ Keep directory names apart by more than case. APFS does not care about case and 
 - Small files, one main type per file, PascalCase file names.
 - Types and non-trivial functions get a `///` doc comment: one line of what it does, `- Parameter` and `- Returns` only when it is not obvious.
 - Inline comments only for the non-obvious why. If a comment repeats the code, delete it.
-- Typed values over strings (`ViewAngle`, `BadgeCorner`). Stateless services are `enum` namespaces.
+- Typed values over strings (`ViewAngle`, `Projection`, `LabelCorner`, `FileType`). Stateless services are `enum` namespaces.
 - Core returns results (`BatchResult`), it does not print.
-- A setting that changes the picture goes into `Signature.make`. If the renderer output itself changes, bump the version prefix there so old icons re-render.
+- Settings live per file type in `Config`. A setting that changes the picture goes into `Signature.make` (per type). If the renderer output itself changes, bump the version prefix there so old icons re-render.
 
 ## Things that already bit us
 

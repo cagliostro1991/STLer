@@ -25,17 +25,19 @@
 
 | Unit | Responsibility |
 | --- | --- |
-| `Config` | Settings model, validation (`set`), JSON persistence, tolerant decoding |
-| `ViewAngle`, `BadgeCorner` | Typed camera presets and label corners |
+| `Config`, `TypeStyle`, `LabelStyle` | Settings model per file type, validation (`set` with dotted keys), JSON persistence, tolerant decoding, migration of old files |
+| `FileType` | `stl`, `3mf`, `step`: extensions, title, lookup by path |
+| `ViewAngle`, `Projection`, `LabelCorner` | Typed camera presets, projection and label corners |
 | `FileScanner` | Recursive search with depth limit, top-level-first ordering, dedupe |
 | `FinderFolder` | Front Finder window via AppleScript (main thread only) |
-| `IconRenderer` | Model file to `NSImage`: material, orthographic camera, lights, optional badge |
+| `IconRenderer` | Model file to `NSImage`: material, orthographic or perspective camera, side light, then the format label (colours, radius, opacity) |
+| `FlatGeometry` | Triangle soup with one normal per triangle; shared by the STL and 3MF paths |
 | `ThreeMFLoader` | 3MF package to one SceneKit node (components, transforms, `p:path`, first plate) |
 | `StepConverter` | STEP to cached STL through `freecadcmd` |
-| `Signature` | `dev.stler.sig` xattr: which settings produced the current icon |
+| `Signature` | `dev.stler.sig` xattr: which settings of the file's type produced the current icon |
 | `IconBatch` | Apply / reset icons; the only place that writes icons |
 | `stler` CLI | Flag parsing and commands; the only place that prints |
-| `STLerApp` | SwiftUI window over the same `Config`; preview and buttons use `IconBatch` |
+| `STLerApp` | SwiftUI window in System Settings style (sidebar: General, one page per type) over the same `Config`; Clear and Apply use `IconBatch`, with confirmation and file counts |
 
 ## Data flow of one folder
 

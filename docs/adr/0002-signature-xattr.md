@@ -5,11 +5,11 @@
 
 ## Context
 
-Reruns must not re-render unchanged files, changing colour/view/badge must re-render only what is stale, and `reset` must never remove icons the user set by hand (a custom icon looks the same whether it is ours or not).
+Reruns must not re-render unchanged files, changing colour, view or label must re-render only what is stale, and `reset` must never remove icons the user set by hand (a custom icon looks the same whether it is ours or not).
 
 ## Decision
 
-Write `dev.stler.sig` (`v3|view|colour|firstPlateOnly|badge`) as an extended attribute on every file we touch. Same signature: skip. Different: re-render. No signature: not ours, never reset.
+Write `dev.stler.sig` as an extended attribute (originally one global string, now one per file type: `v5|<type>|view|projection|colour|...|label...`, see ADR 0012) on every file we touch. Same signature: skip. Different: re-render. No signature: not ours, never reset.
 
 ## Consequences
 

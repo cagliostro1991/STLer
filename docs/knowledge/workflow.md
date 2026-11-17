@@ -1,16 +1,17 @@
 # Workflow recipes
 
 ## Add a setting
-1. Property + doc comment in `Config`, a branch in `Config.set` with validation, tolerant decoding in `init(from:)`.
-2. Does it change the picture? Add it to `Signature.make`; if the renderer output itself changed, bump the `v` prefix.
-3. CLI: flag in `RunOptions` (if per-run) and the `usage` text. App: control in `SettingsView`.
-4. Self-check: validation, fallback, signature effect. README config table.
-5. ADR only if it is a real decision, not just a knob.
+1. Per-type setting: property + doc comment in `TypeStyle` (or `LabelStyle`), a branch in its `set` with validation, tolerant decoding in its `init(from:)`. Global setting: same in `Config`.
+2. Does it change the picture? Add it to `Signature.make` (per type); if the renderer output itself changed, bump the `v` prefix.
+3. CLI: dotted key works automatically through `Config.set`; add a flag in `RunOptions` only if it is useful per run, and update `usage`.
+4. App: a control on the type page in `SettingsView` (bindings go through `style`/`label` helpers).
+5. Self-check: validation, fallback, signature effect, and a pixel check if it changes the picture. README config table.
+6. ADR only if it is a real decision, not just a knob.
 
-## Add a file format
+## Add a file type
 1. Make the file readable as geometry (ModelIO, or a loader producing an `SCNNode`).
-2. Add the extension to `Config.supportedFormats`, `FileScanner.collect`, the `IconRenderer.loadScene` switch, and the sample picker in `SettingsModel`.
-3. Badge text defaults to the extension; override via `Options.badgeText` for aliases (`stp` shows `STEP`).
+2. `FileType` case (extensions, title), a `TypeStyle` field in `Config` with its `subscript` branch and `CodingKeys` entry, `IconRenderer.loadScene`, the sample picker in `SettingsModel`, an icon and tint in `SettingsView`.
+3. Label text is the type title; the old `step` style conversion path (`StepConverter`) is the pattern for formats that need a converter.
 4. Test with a real file from a real tool, plus a tiny generated one in the self-check.
 5. Write the format facts in `docs/knowledge/3mf-and-step.md` (or a new note) and an ADR if it brings a dependency.
 

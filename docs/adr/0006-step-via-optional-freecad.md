@@ -9,7 +9,7 @@ STEP is B-rep (NURBS), not a mesh. macOS has no tessellator and writing one is o
 
 ## Decision
 
-STEP is a config format (`step`, off by default). When enabled, `freecadcmd` (auto-detected in `/Applications`, or `freecadPath`) converts a whole batch in one run to STL in `~/Library/Caches/stler`, keyed by path, modification time and size; the normal pipeline renders that STL with a `STEP` badge. Without FreeCAD the files are skipped with a message.
+STEP is a file type with its own switch (`step.enabled`, off by default). When enabled, `freecadcmd` (auto-detected in `/Applications`, or `freecadPath`) converts a whole batch in one run to STL in `~/Library/Caches/stler`, keyed by path, modification time and size; the normal pipeline renders that STL with a `STEP` badge. Without FreeCAD STEP cannot be switched on: `Config.set` refuses `step.enabled`, `enabledFormats` leaves STEP out, and the STEP page of the window searches for FreeCAD (usual places, then Spotlight `FreeCAD*.app`), offers a manual choice and keeps the toggle off and disabled until it is found.
 
 ## Consequences
 

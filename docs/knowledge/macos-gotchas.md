@@ -7,6 +7,11 @@
 - Finder caches the icons of an already open folder: leave and re-enter it, or `killall Finder` as a last resort. `qlmanage -r cache` resets the Quick Look cache.
 - Embedded thumbnails of `.3mf` (slicer plate previews) are shown by the system; a custom icon overrides them.
 
+## Rendering
+- ModelIO derives smooth normals from welded vertices when an STL has zero facet normals, so a cube comes out as one flat hexagon. We compute flat normals ourselves (`FlatGeometry`).
+- A light on the camera axis lights every face of an isometric cube equally. Keep the key light off-axis (upper left of the camera).
+- Opacity through SceneKit material transparency shows hidden faces through the model; apply it at composite time instead.
+
 ## Build and language
 - `swift build` fails on Command Line Tools only (manifest does not link `PackageDescription`).
 - `@State` is a macro in the current SDK and needs the Xcode-only `SwiftUIMacros` plugin: keep UI state in an `ObservableObject`.

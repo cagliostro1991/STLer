@@ -9,7 +9,7 @@ Settings must be editable from a window and from the shell, and picked up by a l
 
 ## Decision
 
-`Config` (typed: `ViewAngle`, `BadgeCorner`, ...) is persisted as `~/.config/stler/config.json` (`STLER_CONFIG` overrides). The app saves on every change, `follow` reloads it per folder, CLI flags are applied to a copy for one run. Decoding is tolerant per key; validation lives in `Config.set`.
+`Config` (typed: `ViewAngle`, `LabelCorner`, per-type `TypeStyle`, ...) is persisted as `~/.config/stler/config.json` (`STLER_CONFIG` overrides). The app saves on every change, `follow` reloads it per folder, CLI flags are applied to a copy for one run. Decoding is tolerant per key; validation lives in `Config.set`.
 
 ## Consequences
 
