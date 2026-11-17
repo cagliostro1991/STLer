@@ -403,6 +403,11 @@ ActivityLog.requestCancel(foreignEntry.id)
 check(ActivityLog.isCancelRequested(foreignEntry.id), "the window can ask another process to cancel its entry through the shared log")
 unsetenv("STLER_LOG")
 try? FileManager.default.removeItem(at: cancelLog)
+let bugLink = Feedback.issueURL(template: "bug_report.yml").absoluteString
+check(bugLink.hasPrefix("https://github.com/\(UpdateChecker.repository)/issues/new?") && bugLink.contains("template=bug_report.yml") && bugLink.contains("version=\(AppVersion.current)") && bugLink.contains("macos="), "the report link opens the bug form with version and macOS filled in")
+check(Feedback.discussionURL(category: "q-a").absoluteString == "https://github.com/\(UpdateChecker.repository)/discussions/new?category=q-a", "the question link opens a Q&A discussion")
+let formsOnDisk = ["bug_report.yml", "feature_request.yml", "format_request.yml"].allSatisfy { FileManager.default.fileExists(atPath: ".github/ISSUE_TEMPLATE/\($0)") }
+check(formsOnDisk, "the issue forms that the app links to exist in the repository")
 func tintedPixels(_ image: NSImage?) -> (red: Int, blue: Int) {
     guard let tiff = image?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return (0, 0) }
     var counts = (red: 0, blue: 0)

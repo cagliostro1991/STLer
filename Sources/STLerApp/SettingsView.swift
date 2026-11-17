@@ -194,6 +194,11 @@ struct SettingsView: View {
                     case nil: EmptyView()
                     }
                 }
+                HStack {
+                    Link("Report a problem", destination: Feedback.issueURL(template: "bug_report.yml"))
+                    Link("Ask or suggest", destination: Feedback.discussionURL(category: "q-a"))
+                    Link("Help and FAQ", destination: URL(string: "https://github.com/\(UpdateChecker.repository)/wiki")!)
+                }
                 Toggle("Check for updates when the window opens", isOn: $model.config.checkUpdates)
                 Text("Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent.")
                     .font(.callout)
