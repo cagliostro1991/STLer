@@ -37,6 +37,12 @@
   code { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; }
   pre { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 14.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .muted { color: var(--muted); }
+  table.formats { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 15.5px; }
+  table.formats th, table.formats td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.formats th { color: var(--muted); font-weight: 600; font-size: 14px; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+  .dot.green { background: #34c759; } .dot.yellow { background: #ffcc00; } .dot.red { background: #ff453a; }
+  .legend { color: var(--muted); font-size: 14.5px; margin-top: 10px; }
   footer { margin-top: 56px; padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
 </style>
 </head>
@@ -71,6 +77,24 @@
   <h2>How it works</h2>
   <p>macOS has its own thumbnail for STL files, and an app cannot replace it. So STLer renders each model off-screen with SceneKit and sets the picture as the file's own custom icon, the same thing you do by pasting an icon in Get Info, only automatic.</p>
   <p>The app window applies your settings to the files that exist now. The <code>stler</code> command line tool, started at login, keeps watching so files that arrive later get their icons too, also when the window is closed.</p>
+</section>
+
+<section>
+  <h2>Formats</h2>
+  <p>STL, 3MF and STEP work today. This is what could come next. The colour tells how likely it is.</p>
+  <table class="formats">
+    <tr><th>Format</th><th>Status</th><th>Notes</th></tr>
+    <tr><td>STL, 3MF, STEP / STP</td><td><span class="dot green"></span>Done</td><td></td></tr>
+    <tr><td>OBJ, PLY</td><td><span class="dot green"></span>Planned</td><td>Read by macOS itself, same path as STL.</td></tr>
+    <tr><td>IGES / IGS</td><td><span class="dot green"></span>Planned</td><td>Same engines as STEP, another reader.</td></tr>
+    <tr><td>AMF</td><td><span class="dot yellow"></span>Maybe</td><td>Open XML like 3MF, needs its own loader, little used.</td></tr>
+    <tr><td>F3D (Fusion)</td><td><span class="dot yellow"></span>Maybe</td><td>Only the preview picture stored inside the file can be read, so the icon would be Fusion's, not ours.</td></tr>
+    <tr><td>USDZ, ABC</td><td><span class="dot yellow"></span>Maybe</td><td>Readable by macOS, rarely needed for printing.</td></tr>
+    <tr><td>glTF, GLB, DAE</td><td><span class="dot yellow"></span>Maybe</td><td>Open formats, but macOS cannot read them, a parser would be needed.</td></tr>
+    <tr><td>FBX</td><td><span class="dot red"></span>Unlikely</td><td>Autodesk format, the official SDK has a restrictive licence.</td></tr>
+    <tr><td>SLDPRT, IPT, CATPART</td><td><span class="dot red"></span>Unlikely</td><td>Closed CAD formats, unreadable without the vendors' software.</td></tr>
+  </table>
+  <p class="legend"><span class="dot green"></span>done or planned &nbsp; <span class="dot yellow"></span>maybe &nbsp; <span class="dot red"></span>unlikely: closed format or licence. Want one of them? Open an issue on GitHub.</p>
 </section>
 
 <section>

@@ -2,6 +2,8 @@
 
 Isometric (or orthographic) icons for `.stl`, `.3mf` and `.step` files in macOS Finder.
 
+**[Download the latest release](https://github.com/cagliostro1991/STLer/releases)** (macOS 13 or newer) or see [Install](#install).
+
 ![STLer preview: isometric, coloured and front view](docs/preview.png)
 
 macOS ships its own Quick Look provider for STL and does not let third-party
@@ -10,15 +12,31 @@ thumbnail extensions override it (tested: a `QLThumbnailProvider` for
 UTI). STLer renders each model offscreen with SceneKit and sets the result as the
 file's custom icon via `NSWorkspace.setIcon`.
 
+## Formats
+
+STL, 3MF and STEP work today. What could come next, as a traffic light (GREEN = done or planned, YELLOW = maybe, RED = unlikely because the format is closed or the licence is restrictive):
+
+| Format | Light | Notes |
+|---|---|---|
+| STL, 3MF, STEP/STP | GREEN, done | |
+| OBJ, PLY | GREEN, planned | read by macOS itself, same path as STL |
+| IGES/IGS | GREEN, planned | same engines as STEP, another reader |
+| AMF | YELLOW | open XML like 3MF, needs its own loader, little used |
+| F3D (Fusion) | YELLOW | only the embedded preview picture is readable, so the icon would not be ours |
+| USDZ, ABC | YELLOW | readable by macOS, rarely needed for printing |
+| glTF, GLB, DAE | YELLOW | open formats, but macOS cannot read them: a parser is needed |
+| FBX | RED | Autodesk format, the official SDK has a restrictive licence |
+| SLDPRT, IPT, CATPART | RED | closed CAD formats, unreadable without the vendors' software |
+
 ## Install
 
-Download the latest `STLer-<version>-macos.zip` from the Releases page, unpack it and move `STLer.app` to Applications. The build is ad-hoc signed and not notarized: the first time, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine /Applications/STLer.app`. The window checks GitHub for newer releases at most once a day (switch it off in General); `stler update` does the same from the terminal. Release notes template and steps: `docs/release-template.md`.
+Open the [Releases page](https://github.com/cagliostro1991/STLer/releases), download the latest `STLer-<version>-macos.zip` (betas are marked "Pre-release"), unpack it and move `STLer.app` to Applications. The build is ad-hoc signed and not notarized: the first time, right-click the app and choose Open, or run `xattr -dr com.apple.quarantine /Applications/STLer.app`. The window checks GitHub for newer releases at most once a day (switch it off in General); `stler update` does the same from the terminal. Release notes template and steps: `docs/release-template.md`.
 
 ## Build
 
 ```
 make build   # build/stler and build/STLer.app
-make test    # about 80 checks, no Xcode needed
+make test    # about 100 checks (around 20 seconds), no Xcode needed
 ```
 
 Only the Command Line Tools are required; the app is ad-hoc signed. `swift build` is not supported (see `docs/adr/0004-swiftc-and-make-no-xcode.md`).
