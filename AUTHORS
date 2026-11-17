@@ -1,0 +1,7 @@
+Pavlo Zubenko (https://github.com/cagliostro1991) - author and maintainer
+
+Third-party material
+- 3DBenchy by Creative Tools (public domain, https://www.3dbenchy.com/license/): preview model and base of the bundled samples.
+- App icon pack generated with Gemini.
+
+Everyone with a commit is listed in `git shortlog -sne`; add yourself here in your first pull request.

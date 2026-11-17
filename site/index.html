@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STLer: model icons for Finder</title>
+<meta name="description" content="STLer puts a picture of the model on .stl, .3mf and .step files in macOS Finder instead of the generic icon.">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --card: #f4f5f7; --line: #e2e4e8; --accent: #2f6df6; --accent-fg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --fg: #f2f2f4; --muted: #a0a4ab; --card: #202227; --line: #30333a; --accent: #5b8cff; --accent-fg: #0d1220; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  header.hero { text-align: center; padding: 64px 0 24px; }
+  header.hero img.logo { width: 112px; height: 112px; }
+  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.1; margin: 16px 0 8px; letter-spacing: -0.02em; }
+  .tagline { color: var(--muted); font-size: clamp(18px, 2.6vw, 22px); max-width: 640px; margin: 0 auto 28px; }
+  .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+  img.shot { display: block; width: 100%; max-width: 760px; margin: 40px auto 0; border-radius: 14px; border: 1px solid var(--line); }
+  section { padding: 44px 0 0; }
+  h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-top: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 4px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  ol.steps { padding-left: 22px; }
+  ol.steps li { margin: 6px 0; }
+  code { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 14.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .muted { color: var(--muted); }
+  footer { margin-top: 56px; padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <img class="logo" src="icon.png" alt="STLer icon" width="112" height="112">
+  <h1>STLer</h1>
+  <p class="tagline">Your 3D model files show what is inside them. STL, 3MF and STEP icons in Finder, drawn from the model itself.</p>
+  <div class="buttons">
+    <a class="btn primary" href="https://github.com/cagliostro1991/STLer/releases">Download the beta</a>
+    <a class="btn" href="https://github.com/cagliostro1991/STLer">Source on GitHub</a>
+  </div>
+  <p class="note">macOS 13 or newer. Free and open source (MIT). The beta is not notarized yet, see Install.</p>
+  <img class="shot" src="preview.png" alt="Finder with STLer icons: coloured isometric pictures of 3D models">
+</header>
+
+<section>
+  <h2>What you get</h2>
+  <div class="grid">
+    <div class="card"><h3>Icons from the model</h3><p>Every <code>.stl</code>, <code>.3mf</code> and <code>.step</code> gets a small picture of its own geometry, from any standard view, orthographic or perspective.</p></div>
+    <div class="card"><h3>Your look, per file type</h3><p>Colour, view, an optional format label with its own colours, rounding and opacity. A live preview on a Benchy while you change things.</p></div>
+    <div class="card"><h3>3MF projects</h3><p>Bambu Studio and Orca plates: show the first 1, 2, 3 or all. A slider blends the colours stored in the file with your fill colour.</p></div>
+    <div class="card"><h3>STEP assemblies</h3><p>Converted with FreeCAD or with OpenCASCADE, one click to install. Limit big assemblies to the first parts so the picture stays readable.</p></div>
+    <div class="card"><h3>Keeps itself up to date</h3><p>A small background helper gives new downloads, the folder you open in Finder, and files you open from a flash drive their icons.</p></div>
+    <div class="card"><h3>Safe by design</h3><p>File contents and modification dates stay as they were. <code>Clear</code> removes only icons STLer made, never ones you set yourself.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>How it works</h2>
+  <p>macOS has its own thumbnail for STL files, and an app cannot replace it. So STLer renders each model off-screen with SceneKit and sets the picture as the file's own custom icon, the same thing you do by pasting an icon in Get Info, only automatic.</p>
+  <p>The app window applies your settings to the files that exist now. The <code>stler</code> command line tool, started at login, keeps watching so files that arrive later get their icons too, also when the window is closed.</p>
+</section>
+
+<section>
+  <h2>Install</h2>
+  <ol class="steps">
+    <li>Download the latest <code>STLer-…-macos.zip</code> from <a href="https://github.com/cagliostro1991/STLer/releases">Releases</a> and unpack it.</li>
+    <li>Move <code>STLer.app</code> to Applications. The beta is not notarized: the first time, right-click the app and choose Open, or run:
+<pre>xattr -dr com.apple.quarantine /Applications/STLer.app</pre></li>
+    <li>Open it. The welcome sheet explains the rest and offers to install <code>stler follow</code>.</li>
+  </ol>
+  <p class="muted">The command line tool is in the same archive. <code>stler --help</code> lists everything: <code>run</code>, <code>follow</code>, <code>reset</code>, <code>config</code>, <code>install</code>, <code>update</code>.</p>
+</section>
+
+<section>
+  <h2>Privacy</h2>
+  <p>STLer works on your machine and sends nothing about you or your files anywhere. The only network request is the optional update check: it asks GitHub for the public list of STLer releases, at most once a day, and you can switch it off in General. OpenCASCADE, if you choose it for STEP, is downloaded by Homebrew in a Terminal window you can watch.</p>
+</section>
+
+<footer>
+  <p>STLer is built by <a href="https://github.com/cagliostro1991">Pavlo Zubenko</a>. 3DBenchy by <a href="https://www.3dbenchy.com/">Creative Tools</a> (public domain) is the preview model. The icon pack was generated with Gemini.</p>
+  <p><a href="https://github.com/cagliostro1991/STLer">Source</a> · <a href="https://github.com/cagliostro1991/STLer/releases">Releases</a> · <a href="https://github.com/cagliostro1991/STLer/tree/main/docs">Docs and decisions</a> · MIT license</p>
+</footer>
+
+</div>
+</body>
+</html>

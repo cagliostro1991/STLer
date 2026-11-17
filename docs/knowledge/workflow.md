@@ -19,6 +19,8 @@
 Go through `IconBatch`. Run `make test`, then the mutation check from `testing-safely.md`.
 
 ## Release / publish
+A full recipe with a notes template is in `docs/release-template.md`; `Scripts/release.sh` builds the archive.
+
 1. `make test && make build` on a clean checkout.
 2. README matches the code (config table, usage, limitations); roadmap updated.
 3. The user approves the commit message (draft first), then commits; never push or change repo visibility without being asked.

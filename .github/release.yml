@@ -1,0 +1,14 @@
+# Used by "Generate release notes" on GitHub. Label a pull request to put it in a section.
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: New
+      labels: [feature, enhancement]
+    - title: Fixes
+      labels: [bug, fix]
+    - title: Docs and internals
+      labels: [documentation, chore, refactor]
+    - title: Other
+      labels: ["*"]
