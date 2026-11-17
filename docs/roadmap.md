@@ -18,16 +18,16 @@ Last updated 2026-11-17.
 - Pick the biggest STEP parts instead of the first ones (ADR 0016).
 
 ## Formats
-Traffic light: GREEN = done or planned, YELLOW = maybe, RED = unlikely (closed format or licence). The same table is on the site.
+Traffic light: 🟢 done or planned, 🟡 maybe, 🔴 unlikely (closed format or licence). The same table is on the site.
 
 | Format | Light | Notes |
 |---|---|---|
-| STL, 3MF, STEP/STP | GREEN, done | |
-| OBJ, PLY | GREEN, planned | ModelIO reads them, same path as STL |
-| IGES/IGS | GREEN, planned | same engines as STEP (FreeCAD or OpenCASCADE), another reader |
-| AMF | YELLOW | open XML like 3MF, needs its own loader, little used |
-| F3D (Fusion) | YELLOW | only the embedded `Previews/small.png` is readable (ADR 0009), so the icon would be Fusion's picture, not ours |
-| USDZ, ABC | YELLOW | ModelIO reads them, rarely needed for printing |
-| glTF, GLB, DAE | YELLOW | open formats, but ModelIO does not read them: own parser needed |
-| FBX | RED | Autodesk format, the official SDK has a restrictive licence |
-| SLDPRT, IPT, CATPART | RED | closed CAD formats, unreadable without the vendors' software |
+| STL, 3MF, STEP/STP | 🟢 Done | |
+| OBJ, PLY | 🟢 Planned | ModelIO reads them, same path as STL |
+| IGES/IGS | 🟢 Planned | same engines as STEP (FreeCAD or OpenCASCADE), another reader |
+| AMF | 🟡 Maybe | open XML like 3MF, needs its own loader, little used |
+| F3D (Fusion) | 🟡 Maybe | only the embedded `Previews/small.png` is readable (ADR 0009), so the icon would be Fusion's picture, not ours |
+| USDZ, ABC | 🟡 Maybe | ModelIO reads them, rarely needed for printing |
+| glTF, GLB, DAE | 🟡 Maybe | open formats, but ModelIO does not read them: own parser needed |
+| FBX | 🔴 Unlikely | Autodesk format, the official SDK has a restrictive licence |
+| SLDPRT, IPT, CATPART | 🔴 Unlikely | closed CAD formats, unreadable without the vendors' software |

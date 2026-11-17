@@ -24,6 +24,23 @@ Only the Command Line Tools are needed, no Xcode.
 - Using an AI assistant is fine. You still own the result: read the diff, run the tests, and delete anything you cannot explain.
 - The settings window and the LaunchAgent are not covered by tests, so if you change them, say how you checked.
 
+## Before you start
+
+- **Small fix** (typo, obvious bug, doc improvement): just open a pull request.
+- **Anything bigger** (a new setting, a new format, a change in how icons look): open an [issue](https://github.com/cagliostro1991/STLer/issues/new/choose) or start an [idea discussion](https://github.com/cagliostro1991/STLer/discussions/new?category=ideas) first, so nobody writes code that cannot be merged. A new format needs the "File format request" form, the traffic light in the README says how likely it is.
+- Looking for a first task? See the issues labelled [good first issue](https://github.com/cagliostro1991/STLer/labels/good%20first%20issue) and [help wanted](https://github.com/cagliostro1991/STLer/labels/help%20wanted).
+
+## What to expect from us
+
+- A first reply within about a week. It is a spare-time project, a ping after two weeks is fine.
+- Review comments are about the change, kindly meant. Disagreement is allowed, say why. See the [Code of Conduct](CODE_OF_CONDUCT.md).
+- The maintainer decides in the end, and says why when the answer is no. A closed request is not a judgement about you.
+- Every bug fix needs a test that fails without it (see AGENTS.md).
+
 ## Reporting a bug
 
-Include macOS version, the command or window action, what you expected, what happened. For wrong-looking icons attach the model (or a small one that shows the same problem) and the output of `stler config get`.
+Use the [bug report form](https://github.com/cagliostro1991/STLer/issues/new?template=bug_report.yml): it asks for the version, macOS version, what happened and what you expected. For wrong-looking icons attach the model (or a small one that shows the same problem) and the output of `stler config get`. Security problems go to [SECURITY.md](SECURITY.md), not to a public issue.
+
+## Questions and ideas
+
+[Discussions](https://github.com/cagliostro1991/STLer/discussions) is the place for "how do I", "what if" and "look what I made". If a discussion turns into concrete work, it becomes an issue.

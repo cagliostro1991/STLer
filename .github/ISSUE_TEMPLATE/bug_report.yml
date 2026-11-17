@@ -1,0 +1,85 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please look at the [Troubleshooting page](https://github.com/cagliostro1991/STLer/wiki/Troubleshooting) and the open issues first.
+        A question about how to do something is better asked in [Discussions](https://github.com/cagliostro1991/STLer/discussions/new?category=q-a).
+  - type: input
+    id: version
+    attributes:
+      label: STLer version
+      description: "General > About in the window, or `stler version` in Terminal."
+      placeholder: 0.1.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "Version 15.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Icons do not appear or look wrong
+        - Settings window
+        - stler follow (automatic icons)
+        - STEP conversion (FreeCAD or OpenCASCADE)
+        - 3MF (plates, colours)
+        - Install or update
+        - Command line tool
+        - Something else
+    validations:
+      required: true
+  - type: checkboxes
+    id: types
+    attributes:
+      label: File types involved
+      options:
+        - label: STL
+        - label: 3MF
+        - label: STEP
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you saw. A screenshot of the window helps (not of the whole screen, it may show private things).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Journal or log
+      description: "The text from the journal popup, or the end of `~/Library/Logs/stler.log` for stler follow. Remove paths you do not want to share."
+      render: text
+  - type: textarea
+    id: model
+    attributes:
+      label: A model that shows it (optional)
+      description: "Link or attach a small file that shows the problem. Only share files you have the right to share."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I searched the open and closed issues
+          required: true

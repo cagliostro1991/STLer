@@ -1,0 +1,38 @@
+name: File format request
+description: Ask for icons for another 3D file format
+labels: [format-request, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The list of formats with a traffic light (planned, maybe, unlikely) is in the [README](https://github.com/cagliostro1991/STLer#formats). Check it first, and give a thumbs up on an existing request instead of opening a second one.
+  - type: input
+    id: format
+    attributes:
+      label: Format name and extension
+      placeholder: "OBJ (.obj)"
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: Link to the specification or documentation
+      description: "Is the format open and documented? A link tells us if it is realistic."
+  - type: textarea
+    id: why
+    attributes:
+      label: Why do you need it?
+      description: "Which program makes these files, how many do you have, what would the icon help you with?"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: A small sample file
+      description: "Attach or link a small file in this format. Only share files you have the right to share."
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before sending
+      options:
+        - label: The format is not already marked red in the README (closed format or restrictive licence), or I know a way around that

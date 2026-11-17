@@ -1,0 +1,16 @@
+title: "[Question] "
+body:
+  - type: markdown
+    attributes:
+      value: "Quick look first: [FAQ](https://github.com/cagliostro1991/STLer/wiki/FAQ) and [Troubleshooting](https://github.com/cagliostro1991/STLer/wiki/Troubleshooting) may already have the answer."
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: STLer version and macOS version
+      placeholder: "0.1.0-beta.1, macOS 15.1"

@@ -2,6 +2,10 @@
 
 Isometric (or orthographic) icons for `.stl`, `.3mf` and `.step` files in macOS Finder.
 
+[![Release](https://img.shields.io/github/v/release/cagliostro1991/STLer?include_prereleases&label=release)](https://github.com/cagliostro1991/STLer/releases)
+[![License: MIT](https://img.shields.io/github/license/cagliostro1991/STLer)](LICENSE)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue)
+
 **[Download the latest release](https://github.com/cagliostro1991/STLer/releases)** (macOS 13 or newer) or see [Install](#install).
 
 ![STLer preview: isometric, coloured and front view](docs/preview.png)
@@ -14,19 +18,31 @@ file's custom icon via `NSWorkspace.setIcon`.
 
 ## Formats
 
-STL, 3MF and STEP work today. What could come next, as a traffic light (GREEN = done or planned, YELLOW = maybe, RED = unlikely because the format is closed or the licence is restrictive):
+STL, 3MF and STEP work today. What could come next, as a traffic light: 🟢 done or planned, 🟡 maybe, 🔴 unlikely because the format is closed or the licence is restrictive.
 
 | Format | Light | Notes |
 |---|---|---|
-| STL, 3MF, STEP/STP | GREEN, done | |
-| OBJ, PLY | GREEN, planned | read by macOS itself, same path as STL |
-| IGES/IGS | GREEN, planned | same engines as STEP, another reader |
-| AMF | YELLOW | open XML like 3MF, needs its own loader, little used |
-| F3D (Fusion) | YELLOW | only the embedded preview picture is readable, so the icon would not be ours |
-| USDZ, ABC | YELLOW | readable by macOS, rarely needed for printing |
-| glTF, GLB, DAE | YELLOW | open formats, but macOS cannot read them: a parser is needed |
-| FBX | RED | Autodesk format, the official SDK has a restrictive licence |
-| SLDPRT, IPT, CATPART | RED | closed CAD formats, unreadable without the vendors' software |
+| STL, 3MF, STEP/STP | 🟢 Done | |
+| OBJ, PLY | 🟢 Planned | read by macOS itself, same path as STL |
+| IGES/IGS | 🟢 Planned | same engines as STEP, another reader |
+| AMF | 🟡 Maybe | open XML like 3MF, needs its own loader, little used |
+| F3D (Fusion) | 🟡 Maybe | only the embedded preview picture is readable, so the icon would not be ours |
+| USDZ, ABC | 🟡 Maybe | readable by macOS, rarely needed for printing |
+| glTF, GLB, DAE | 🟡 Maybe | open formats, but macOS cannot read them: a parser is needed |
+| FBX | 🔴 Unlikely | Autodesk format, the official SDK has a restrictive licence |
+| SLDPRT, IPT, CATPART | 🔴 Unlikely | closed CAD formats, unreadable without the vendors' software |
+
+## Help, ideas, bugs
+
+| You want to... | Go here |
+|---|---|
+| learn, fix a common problem | the [wiki](https://github.com/cagliostro1991/STLer/wiki): Getting started, FAQ, Troubleshooting |
+| ask a question, share an idea | [Discussions](https://github.com/cagliostro1991/STLer/discussions) |
+| report a bug | [bug report form](https://github.com/cagliostro1991/STLer/issues/new?template=bug_report.yml) |
+| ask for a file format | [format request form](https://github.com/cagliostro1991/STLer/issues/new?template=format_request.yml) |
+| report a security problem | [private report](https://github.com/cagliostro1991/STLer/security/advisories/new), see [SECURITY.md](SECURITY.md) |
+
+In the app, General > About has "Report a problem", "Ask or suggest" and "Help and FAQ" with your versions already filled in. How to contribute: [CONTRIBUTING.md](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Install
 

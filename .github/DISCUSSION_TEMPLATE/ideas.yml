@@ -1,0 +1,14 @@
+title: "[Idea] "
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What is the idea?
+      description: The problem you run into first, then what you would change. Rough is fine.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: How do you use STLer today?
+      description: "Which formats, which slicer or CAD program, how many files."
