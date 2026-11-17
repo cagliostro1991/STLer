@@ -14,7 +14,7 @@ usage:
   stler reset <folder|file>... remove icons set by stler
   stler config get [key] | set <key> <value>
 views: iso front back left right top bottom
-keys:  firstPlateOnly followDepth freecadPath scope scopeFolders (comma list)
+keys:  followDepth stepEngine (freecad|opencascade) freecadPath scope scopeFolders (comma list)
        <type>.enabled <type>.view <type>.projection <type>.color
        <type>.label.corner|textColor|backgroundColor|cornerRadius|opacity     (type: stl, 3mf, step)
 run flags change every enabled type for this run only; without paths run uses the folder open in Finder (fallback: cwd).
@@ -77,7 +77,7 @@ func runIcons(_ arguments: [String]) throws {
         files.forEach { print($0) }
         return
     }
-    let result = IconBatch.apply(files, config: options.config, force: options.force) { done, total in
+    let result = IconBatch.apply(files, config: options.config, force: options.force) { done, total, _ in
         if done % 25 == 0 { print("[\(done)/\(total)]") }
     }
     result.messages.forEach { print($0) }
@@ -128,12 +128,27 @@ func follow() -> Never {
         while let current = folder, current != last {
             last = current
             var lastCheck = Date()
-            let result = IconBatch.applyToFolder(current, config: Config.load(), shouldContinue: {
+            var entry: ActivityLog.Entry?
+            var lastWrite = Date.distantPast
+            let result = IconBatch.applyToFolder(current, config: Config.load(), onProgress: { done, total, file in
+                var shown = entry ?? ActivityLog.Entry(title: "Finder: \((current as NSString).abbreviatingWithTildeInPath)", running: true)
+                shown.done = done; shown.total = total; shown.current = file
+                entry = shown
+                guard Date().timeIntervalSince(lastWrite) > 1 || done == 1 else { return }
+                lastWrite = Date()
+                ActivityLog.upsert(shown)
+            }, shouldContinue: {
                 guard Date().timeIntervalSince(lastCheck) > 1.5 else { return true }
                 lastCheck = Date()
                 let front = FinderFolder.front()
                 return front == nil || front == current
             })
+            if var finished = entry {
+                finished.running = false
+                finished.current = ""
+                finished.summary = summary(result) + (result.interrupted ? " (interrupted, another folder opened)" : "")
+                ActivityLog.upsert(finished)
+            }
             print("\(current): \(summary(result))\(result.interrupted ? " (interrupted, another folder opened)" : "")")
             folder = result.interrupted ? FinderFolder.front() : nil
         }

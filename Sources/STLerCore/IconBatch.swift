@@ -17,9 +17,9 @@ enum IconBatch {
     /// Renders and stamps every file of an enabled type whose signature differs from the current settings of its type
     /// (all of them with `force`).
     /// - Parameters:
-    ///   - onProgress: Called once per file with the number of files handled so far and the total.
+    ///   - onProgress: Called once per file with the number of files handled so far, the total and the file being handled.
     ///   - shouldContinue: Asked before each file; returning false stops the run (`interrupted` is set).
-    static func apply(_ files: [String], config: Config, force: Bool = false, onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
+    static func apply(_ files: [String], config: Config, force: Bool = false, onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
         var result = BatchResult()
         let stale = files.filter { staleType(of: $0, config: config, force: force) != nil }
         let converted = convertSteps(in: stale, config: config, result: &result)
@@ -29,9 +29,9 @@ enum IconBatch {
                 result.interrupted = true
                 break
             }
-            onProgress?(index + 1, files.count)
+            onProgress?(index + 1, files.count, file)
             guard let type = staleType(of: file, config: config, force: force) else { result.skipped += 1; continue }
-            let options = IconRenderer.Options(style: config[type], firstPlateOnly: config.firstPlateOnly, labelText: type.title)
+            let options = IconRenderer.Options(style: config[type], labelText: type.title)
             guard let source = type == .step ? converted[file] : URL(fileURLWithPath: file),
                   let image = IconRenderer.render(source, size: iconSize, options: options),
                   setIcon(image, on: file, signature: Signature.make(for: config, type: type)) else {
@@ -45,15 +45,17 @@ enum IconBatch {
     }
 
     /// `apply` for one folder, down to `config.followDepth`, top level first.
-    static func applyToFolder(_ folder: String, config: Config, onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
+    static func applyToFolder(_ folder: String, config: Config, onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
         apply(FileScanner.scan([folder], formats: config.enabledFormats, maxDepth: config.maxDepth), config: config, onProgress: onProgress, shouldContinue: shouldContinue)
     }
 
     /// Removes only icons carrying our signature, so icons set by the user stay.
     /// - Returns: How many files were reset and how many were left alone.
-    static func reset(_ files: [String]) -> (reset: Int, untouched: Int) {
+    static func reset(_ files: [String], onProgress: ((_ done: Int, _ total: Int, _ file: String) -> Void)? = nil) -> (reset: Int, untouched: Int) {
         var done = 0
-        for file in files where Signature.read(file) != nil {
+        for (index, file) in files.enumerated() {
+            onProgress?(index + 1, files.count, file)
+            guard Signature.read(file) != nil else { continue }
             preservingModDate(file) {
                 NSWorkspace.shared.setIcon(nil, forFile: file, options: [])
                 Signature.remove(file)
@@ -73,11 +75,9 @@ enum IconBatch {
     private static func convertSteps(in files: [String], config: Config, result: inout BatchResult) -> [String: URL] {
         let steps = files.filter(StepConverter.isStep)
         guard !steps.isEmpty else { return [:] }
-        guard let freecad = StepConverter.executable(config.freecadPath) else {
-            result.messages.append("STEP skipped: freecadcmd not found (install FreeCAD or set freecadPath)")
-            return [:]
-        }
-        return StepConverter.convert(steps, freecad: freecad)
+        let converted = StepConverter.convert(steps, config: config)
+        if let error = converted.error { result.messages.append("STEP skipped: \(error)") }
+        return converted.urls
     }
 
     private static func setIcon(_ image: NSImage, on path: String, signature: String) -> Bool {

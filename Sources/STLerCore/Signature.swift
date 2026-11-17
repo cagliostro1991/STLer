@@ -10,8 +10,8 @@ enum Signature {
     static func make(for config: Config, type: FileType) -> String {
         let style = config[type]
         let label = style.label
-        var parts = ["v5", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color]
-        if type == .threeMF { parts.append(String(config.firstPlateOnly)) }
+        var parts = ["v6", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color]
+        if type != .stl { parts += [String(style.limit), String(style.modelColors)] }
         parts += [label.corner.rawValue, label.textColor, label.backgroundColor, String(label.cornerRadius), String(label.opacity)]
         return parts.joined(separator: "|")
     }

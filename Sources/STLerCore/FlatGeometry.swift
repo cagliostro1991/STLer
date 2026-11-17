@@ -3,11 +3,17 @@ import simd
 
 /// Faceted geometry with one normal per triangle, like a slicer preview.
 enum FlatGeometry {
-    /// - Parameter points: Triangle corners, three per triangle.
-    static func make(points: [SCNVector3]) -> SCNGeometry {
-        SCNGeometry(
-            sources: [SCNGeometrySource(vertices: points), SCNGeometrySource(normals: normals(for: points))],
-            elements: [SCNGeometryElement(indices: (0..<Int32(points.count)).map { $0 }, primitiveType: .triangles)])
+    /// - Parameters:
+    ///   - points: Triangle corners, three per triangle.
+    ///   - colors: Optional colour per corner (RGB, 0...1), same count as `points`.
+    static func make(points: [SCNVector3], colors: [SIMD3<Float>]? = nil) -> SCNGeometry {
+        var sources = [SCNGeometrySource(vertices: points), SCNGeometrySource(normals: normals(for: points))]
+        if let colors, colors.count == points.count {
+            sources.append(SCNGeometrySource(
+                data: colors.withUnsafeBufferPointer { Data(buffer: $0) }, semantic: .color, vectorCount: colors.count,
+                usesFloatComponents: true, componentsPerVector: 3, bytesPerComponent: 4, dataOffset: 0, dataStride: MemoryLayout<SIMD3<Float>>.stride))
+        }
+        return SCNGeometry(sources: sources, elements: [SCNGeometryElement(indices: (0..<Int32(points.count)).map { $0 }, primitiveType: .triangles)])
     }
 
     /// Triangle corners of a geometry that is made of plain triangles, or `nil` for anything else.

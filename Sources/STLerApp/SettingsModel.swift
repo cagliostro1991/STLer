@@ -23,7 +23,7 @@ final class SettingsModel: ObservableObject {
         didSet {
             guard config != oldValue else { return }
             try? config.save()
-            if config.freecadPath != oldValue.freecadPath { refreshFreecad() }
+            if config.freecadPath != oldValue.freecadPath || config.stepEngine != oldValue.stepEngine { refreshFreecad() }
             refreshPreview()
         }
     }
@@ -34,24 +34,41 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var sample: URL?
     @Published private(set) var status = ""
     @Published private(set) var busy = false
-    /// 0...1 while a batch is running, `nil` otherwise.
-    @Published private(set) var progress: Double?
+    /// The journal as one stream: finished (last 10), running, queued. Includes what `stler follow` did.
+    @Published private(set) var journal: [Job] = []
+    @Published var showJournal = false
     @Published var pending: Pending?
     /// Resolved `freecadcmd`, `nil` when FreeCAD cannot be found (STEP is then off and cannot be enabled).
     @Published private(set) var freecad: String?
+    /// Whether the chosen STEP engine is available; STEP is off and cannot be enabled otherwise.
+    @Published private(set) var stepReady = false
     /// Spotlight estimate of model files per type under the home folder; `nil` while counting or not requested.
     @Published private(set) var homeEstimate: [FileType: Int]?
     /// Set while the user is asked to confirm switching the scope to the home folder.
     @Published var confirmingHome = false
 
     private let queue = DispatchQueue(label: "stler.render", qos: .userInitiated)
+    private let jobQueue = JobQueue()
     private var previewToken = 0
 
     init() {
         sample = Bundle.main.url(forResource: "3DBenchy", withExtension: "stl")
         refreshFreecad()
         refreshPreview()
+        jobQueue.didChange = { [weak self] in DispatchQueue.main.async { self?.refreshJournal() } }
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refreshJournal() }
     }
+
+    /// Merges the window's own jobs with the shared log of `stler follow`: finished ones by time, then running, then queued.
+    func refreshJournal() {
+        let all = jobQueue.jobs + ActivityLog.jobs()
+        let finished = all.filter { $0.state == .done }.sorted { $0.finishedAt < $1.finishedAt }.suffix(JobQueue.keepFinished)
+        let merged = Array(finished) + all.filter { $0.state == .running } + all.filter { $0.state == .queued }
+        if merged != journal { journal = merged }
+    }
+
+    /// Jobs that are running or waiting, for the badge on the journal button.
+    var activeJobs: Int { journal.filter { $0.state != .done }.count }
 
     /// Type whose style the preview shows: the open page, STL on the general page.
     var previewType: FileType {
@@ -83,10 +100,19 @@ final class SettingsModel: ObservableObject {
         config.scopeFolders.remove(at: index)
     }
 
-    /// Looks up FreeCAD without searching the disk and switches STEP off when it is missing.
+    /// Looks up the STEP engines without searching the disk and switches STEP off when the chosen one is missing.
     func refreshFreecad() {
         freecad = StepConverter.executable(config.freecadPath)
-        if freecad == nil, config.step.enabled { config.step.enabled = false }
+        stepReady = StepConverter.isReady(config)
+        if !stepReady, config.step.enabled { config.step.enabled = false }
+    }
+
+    /// Opens Terminal with the OpenCASCADE install, see `OpenCascade.install`.
+    func installOpenCascade() { status = OpenCascade.install() }
+
+    func checkOpenCascade() {
+        refreshFreecad()
+        status = OpenCascade.prefix == nil ? "OpenCASCADE is still not installed." : "OpenCASCADE found."
     }
 
     /// Searches the usual locations and the Spotlight index for FreeCAD and stores what it finds in the config.
@@ -118,9 +144,10 @@ final class SettingsModel: ObservableObject {
     }
 
     /// Asks for confirmation (with a quick file count) before the scope becomes the home folder.
+    /// Counts first and opens the dialog afterwards: a presented dialog keeps the text it was opened with.
     func proposeHomeScope() {
-        confirmingHome = true
-        estimateHome()
+        status = "Counting model files in your home folder ..."
+        estimateHome { self.status = ""; self.confirmingHome = true }
     }
 
     func confirmHomeScope() {
@@ -132,11 +159,11 @@ final class SettingsModel: ObservableObject {
         if config.scope == .home, homeEstimate == nil { estimateHome() }
     }
 
-    private func estimateHome() {
+    private func estimateHome(then done: @escaping () -> Void = {}) {
         homeEstimate = nil
         DispatchQueue.global(qos: .userInitiated).async {
             let estimate = FileScanner.estimate(in: NSHomeDirectory())
-            DispatchQueue.main.async { self.homeEstimate = estimate }
+            DispatchQueue.main.async { self.homeEstimate = estimate; done() }
         }
     }
 
@@ -144,12 +171,12 @@ final class SettingsModel: ObservableObject {
     func request(_ action: Action, for type: FileType) {
         let paths = config.scopePaths
         guard !paths.isEmpty else { status = "Add a folder first (General)."; return }
-        let home = config.scope == .home
-        let needsConfirmation = action == .clear || home
+        let needsConfirmation = action == .clear || config.scope == .home
         busy = true
         status = "Counting \(type.title) files ..."
         queue.async {
-            let files = home ? FileScanner.spotlight(type, in: NSHomeDirectory()) : FileScanner.scan(paths, formats: [type.rawValue])
+            var seen = Set<String>()
+            let files = paths.flatMap { FileScanner.spotlight(type, in: $0) }.filter { seen.insert($0).inserted }
             DispatchQueue.main.async {
                 self.busy = false
                 if files.isEmpty {
@@ -172,16 +199,17 @@ final class SettingsModel: ObservableObject {
 
     private func run(_ action: Action, _ type: FileType, _ files: [String]) {
         let config = config
+        showJournal = true
         switch action {
         case .clear:
-            work("Clearing \(files.count) \(type.title) files ...") { _ in
-                let r = IconBatch.reset(files)
+            jobQueue.enqueue("Clear \(type.title) icons (\(files.count) files)") { reporter in
+                let r = IconBatch.reset(files, onProgress: reporter.progress)
                 return "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
             }
         case .apply:
-            work("Rendering \(files.count) \(type.title) files ...") { progress in
-                let r = IconBatch.apply(files, config: config, onProgress: progress)
-                return "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)."
+            jobQueue.enqueue("Apply \(type.title) (\(files.count) files)") { reporter in
+                let r = IconBatch.apply(files, config: config, onProgress: reporter.progress)
+                return "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
             }
         }
     }
@@ -190,25 +218,10 @@ final class SettingsModel: ObservableObject {
         guard let url = sample else { preview = nil; return }
         previewToken += 1
         let token = previewToken, type = previewType
-        let options = IconRenderer.Options(style: config[type], firstPlateOnly: config.firstPlateOnly, labelText: type.title)
+        let options = IconRenderer.Options(style: config[type], labelText: type.title)
         queue.async {
             let image = IconRenderer.render(url, size: CGSize(width: 384, height: 384), options: options)
             DispatchQueue.main.async { if token == self.previewToken { self.preview = image } }
-        }
-    }
-
-    private func work(_ title: String, _ job: @escaping (_ progress: @escaping (Int, Int) -> Void) -> String) {
-        busy = true
-        status = title
-        queue.async {
-            let result = job { done, total in
-                DispatchQueue.main.async { self.progress = Double(done) / Double(total) }
-            }
-            DispatchQueue.main.async {
-                self.status = result
-                self.busy = false
-                self.progress = nil
-            }
         }
     }
 }

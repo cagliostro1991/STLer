@@ -17,11 +17,11 @@ enum FileScanner {
                 continue
             }
             let root = URL(fileURLWithPath: path)
-            let rootDepth = root.standardizedFileURL.pathComponents.count
+            let rootDepth = maxDepth == nil ? 0 : root.standardizedFileURL.pathComponents.count
             let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles, .skipsPackageDescendants])
             while let url = walker?.nextObject() as? URL {
-                let depth = url.standardizedFileURL.pathComponents.count - rootDepth
-                if let maxDepth, depth >= maxDepth, (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { walker?.skipDescendants() }
+                if let maxDepth, url.standardizedFileURL.pathComponents.count - rootDepth >= maxDepth,
+                   (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { walker?.skipDescendants() }
                 if allowed.contains(url.pathExtension.lowercased()) { files.append(url.path) }
             }
         }
@@ -61,7 +61,14 @@ enum FileScanner {
 
     /// Spotlight-based file counts per type under `folder`.
     static func estimate(in folder: String) -> [FileType: Int] {
-        Dictionary(uniqueKeysWithValues: FileType.allCases.map { ($0, spotlight($0, in: folder).count) })
+        var counts = [FileType: Int]()
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: FileType.allCases.count) { index in
+            let type = FileType.allCases[index]
+            let count = spotlight(type, in: folder).count
+            lock.lock(); counts[type] = count; lock.unlock()
+        }
+        return counts
     }
 
     /// False for files inside hidden folders, `Library` and package-like folders (apps, bundles, photo libraries).

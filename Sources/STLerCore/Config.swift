@@ -52,10 +52,15 @@ struct TypeStyle: Codable, Equatable {
     /// `system` (system gray) or `#rrggbb`.
     var color = "system"
     var label = LabelStyle()
+    /// How much of the model to show; 0 means all. 3MF: plates (Bambu/Orca projects). STEP: parts of an assembly, in file order.
+    var limit = 0
+    /// 0...100: how much of the colours stored in the model file replaces the fill `color`. 3MF only for now.
+    var modelColors = 0
 
-    init(enabled: Bool = true, color: String = "system") {
+    init(enabled: Bool = true, color: String = "system", limit: Int = 0) {
         self.enabled = enabled
         self.color = color
+        self.limit = limit
     }
 
     init(from decoder: Decoder) throws {
@@ -66,6 +71,8 @@ struct TypeStyle: Codable, Equatable {
         projection = read(.projection, projection)
         color = read(.color, color)
         label = read(.label, label)
+        limit = max(read(.limit, limit), 0)
+        modelColors = min(max(read(.modelColors, modelColors), 0), 100)
     }
 
     var nsColor: NSColor { Config.parseColor(color) ?? .systemGray }
@@ -86,6 +93,12 @@ struct TypeStyle: Codable, Equatable {
         case "color":
             guard Config.parseColor(value) != nil else { return "color must be `system` or #RRGGBB" }
             color = value.lowercased()
+        case "modelColors":
+            guard let percent = Int(value), (0...100).contains(percent) else { return "modelColors must be a number from 0 to 100" }
+            modelColors = percent
+        case "limit":
+            guard value == "all" || (Int(value) ?? -1) >= 1 else { return "limit must be 1, 2, 3... or `all` (3MF: plates, STEP: parts)" }
+            limit = Int(value) ?? 0
         default:
             return "unknown key `\(key)`"
         }
@@ -97,13 +110,13 @@ struct TypeStyle: Codable, Equatable {
 /// Older files with global `view`/`color`/`formats`/`badge` keys are migrated when read.
 struct Config: Codable, Equatable {
     var stl = TypeStyle(color: FileType.stl.defaultColor)
-    var threeMF = TypeStyle(color: FileType.threeMF.defaultColor)
+    var threeMF = TypeStyle(color: FileType.threeMF.defaultColor, limit: 1)
     var step = TypeStyle(enabled: false, color: FileType.step.defaultColor)
-    /// For multi-plate 3MF projects, render only the first plate.
-    var firstPlateOnly = true
     /// Folder levels processed by `follow`; 0 means unlimited.
     var followDepth = 3
-    /// `freecadcmd` location for STEP; empty means the usual install locations. STEP stays off without it.
+    /// STEP converter. STEP stays off while the chosen one is missing.
+    var stepEngine = StepEngine.freecad
+    /// `freecadcmd` location for the FreeCAD engine; empty means the usual install locations.
     var freecadPath = ""
     /// Where the app's Clear and Apply buttons work: the listed folders, or the whole home folder.
     var scope = Scope.folder
@@ -112,10 +125,10 @@ struct Config: Codable, Equatable {
     enum Scope: String, Codable { case folder, home }
 
     private enum CodingKeys: String, CodingKey {
-        case stl, threeMF = "3mf", step, firstPlateOnly, followDepth, freecadPath, scope, scopeFolders
+        case stl, threeMF = "3mf", step, followDepth, stepEngine, freecadPath, scope, scopeFolders
     }
 
-    private enum LegacyKeys: String, CodingKey { case view, color, formats, badge, scopeFolder }
+    private enum LegacyKeys: String, CodingKey { case view, color, formats, badge, scopeFolder, firstPlateOnly }
 
     static let url = ProcessInfo.processInfo.environment["STLER_CONFIG"].map { URL(fileURLWithPath: $0) }
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/stler/config.json")
@@ -137,9 +150,9 @@ struct Config: Codable, Equatable {
         }
     }
 
-    /// Formats to scan for, as `FileScanner` expects them. STEP counts only while FreeCAD can be found.
+    /// Formats to scan for, as `FileScanner` expects them. STEP counts only while its engine is available.
     var enabledFormats: [String] {
-        FileType.allCases.filter { self[$0].enabled && ($0 != .step || StepConverter.executable(freecadPath) != nil) }.map(\.rawValue)
+        FileType.allCases.filter { self[$0].enabled && ($0 != .step || StepConverter.isReady(self)) }.map(\.rawValue)
     }
 
     /// `followDepth` as an optional limit.
@@ -163,9 +176,12 @@ struct Config: Codable, Equatable {
         stl = read(.stl, stl)
         threeMF = read(.threeMF, threeMF)
         step = read(.step, step)
-        firstPlateOnly = read(.firstPlateOnly, firstPlateOnly)
         followDepth = read(.followDepth, followDepth)
+        stepEngine = read(.stepEngine, stepEngine)
         freecadPath = read(.freecadPath, freecadPath)
+        if let firstPlateOnly = (try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(Bool.self, forKey: .firstPlateOnly)) ?? nil {
+            threeMF.limit = firstPlateOnly ? 1 : 0
+        }
         scope = read(.scope, scope)
         scopeFolders = read(.scopeFolders, scopeFolders)
         if scopeFolders.isEmpty, let old = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(String.self, forKey: .scopeFolder), !old.isEmpty {
@@ -207,18 +223,18 @@ struct Config: Codable, Equatable {
     mutating func set(_ key: String, _ value: String) -> String? {
         let parts = key.split(separator: ".", maxSplits: 1).map(String.init)
         if parts.count == 2, let type = FileType(rawValue: parts[0]) {
-            if type == .step, parts[1] == "enabled", Bool(value) == true, StepConverter.executable(freecadPath) == nil {
-                return "STEP needs FreeCAD: install it or set freecadPath to an executable freecadcmd first"
+            if type == .step, parts[1] == "enabled", Bool(value) == true, !StepConverter.isReady(self) {
+                return "STEP needs its engine (\(stepEngine.title)): install it first, or switch stepEngine"
             }
             return self[type].set(parts[1], value)
         }
         switch key {
-        case "firstPlateOnly":
-            guard let b = Bool(value) else { return "firstPlateOnly must be true or false" }
-            firstPlateOnly = b
         case "followDepth":
             guard value == "deep" || (Int(value) ?? 0) >= 1 else { return "followDepth must be 1, 2, 3... or `deep` (unlimited)" }
             followDepth = Int(value) ?? 0
+        case "stepEngine":
+            guard let engine = StepEngine(rawValue: value) else { return "stepEngine must be freecad or opencascade" }
+            stepEngine = engine
         case "freecadPath":
             guard value.isEmpty || FileManager.default.isExecutableFile(atPath: (value as NSString).expandingTildeInPath) else { return "freecadPath must be empty (auto-detect) or an executable freecadcmd" }
             freecadPath = value

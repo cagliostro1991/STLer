@@ -71,6 +71,7 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 detail
                 Divider()
+                if model.showJournal { journalPanel }
                 footer
             }
             .navigationTitle(title)
@@ -86,7 +87,7 @@ struct SettingsView: View {
     /// The type's own colour, gray while the type is switched off.
     private func sidebarTint(_ type: FileType) -> Color {
         let style = model.config[type]
-        return style.enabled && (type != .step || model.freecad != nil) ? Color(nsColor: style.nsColor) : .gray
+        return style.enabled && (type != .step || model.stepReady) ? Color(nsColor: style.nsColor) : .gray
     }
 
     private var title: String {
@@ -177,7 +178,7 @@ struct SettingsView: View {
             if type == .step { freecadSection }
             Section {
                 Toggle("Show icons for \(type.title) files", isOn: enabledBinding(type))
-                    .disabled(type == .step && model.freecad == nil)
+                    .disabled(type == .step && !model.stepReady)
             }
             if model.config[type].enabled {
                 Section("Appearance") {
@@ -190,9 +191,8 @@ struct SettingsView: View {
                     Toggle("System default colour", isOn: systemColor(type))
                     ColorPicker("Colour", selection: colorBinding(type, \.color), supportsOpacity: false)
                         .disabled(model.config[type].color == "system")
-                    if type == .threeMF {
-                        Toggle("First plate only", isOn: $model.config.firstPlateOnly)
-                    }
+                    if type == .threeMF { modelColorsSlider(type) }
+                    if type != .stl { limitPicker(type) }
                 }
                 labelSection(type)
                 Section("Actions") {
@@ -214,27 +214,71 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    private var freecadSection: some View {
-        Section("FreeCAD") {
-            LabeledContent("freecadcmd") {
-                Text(model.freecad ?? "Not found")
-                    .foregroundStyle(model.freecad == nil ? .orange : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            HStack {
-                Button("Find automatically") { model.searchFreecad() }
-                Button("Choose...") { model.chooseFreecad() }
-                if !model.config.freecadPath.isEmpty {
-                    Button("Forget") { model.config.freecadPath = "" }
+    /// How much of the colours stored in the file shows instead of the single fill colour.
+    private func modelColorsSlider(_ type: FileType) -> some View {
+        let percent = Binding<Double>(get: { Double(model.config[type].modelColors) }, set: { model.config[type].modelColors = Int($0) })
+        return VStack(alignment: .leading, spacing: 2) {
+            LabeledContent("Model colours") {
+                HStack {
+                    Slider(value: percent, in: 0...100, step: 5).frame(width: 180)
+                    Text("\(model.config[type].modelColors)%").monospacedDigit().frame(width: 40, alignment: .trailing)
                 }
             }
-            .disabled(model.busy)
-            Text("STEP files are converted with FreeCAD. Without it STEP stays off.")
+            Text("0% paints everything with the fill colour. Higher values show the colours stored in the file (3MF materials, Bambu/Orca filaments); parts without a colour keep the fill.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// 3MF: how many plates to show. STEP: how many parts of an assembly (a few big parts read better than hundreds of tiny ones).
+    private func limitPicker(_ type: FileType) -> some View {
+        let choices = type == .threeMF ? [1, 2, 3, 4, 6, 8] : [5, 10, 25, 50, 100, 250]
+        let current = model.config[type].limit
+        return Picker(type == .threeMF ? "Plates to show" : "Parts to show", selection: style(type, \.limit)) {
+            Text("All").tag(0)
+            ForEach(choices + (current == 0 || choices.contains(current) ? [] : [current]), id: \.self) { Text("First \($0)").tag($0) }
+        }
+    }
+
+    private var freecadSection: some View {
+        Section("STEP engine") {
+            Picker("Convert with", selection: $model.config.stepEngine) {
+                ForEach(StepEngine.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            if model.config.stepEngine == .freecad {
+                LabeledContent("freecadcmd") {
+                    Text(model.freecad ?? "Not found")
+                        .foregroundStyle(model.freecad == nil ? .orange : .secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                HStack {
+                    Button("Find automatically") { model.searchFreecad() }
+                    Button("Choose...") { model.chooseFreecad() }
+                    if !model.config.freecadPath.isEmpty {
+                        Button("Forget") { model.config.freecadPath = "" }
+                    }
+                }
+                .disabled(model.busy)
+            } else {
+                LabeledContent("OpenCASCADE") {
+                    Text(OpenCascade.prefix ?? "Not installed")
+                        .foregroundStyle(model.stepReady ? Color.secondary : Color.orange)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                HStack {
+                    if !model.stepReady { Button("Install (45 MB download)") { model.installOpenCascade() } }
+                    Button("Check again") { model.checkOpenCascade() }
+                }
+            }
+            Text(model.config.stepEngine == .freecad
+                ? "STEP files are converted with FreeCAD (about 2 GB). Use either FreeCAD or OpenCASCADE, not both."
+                : "STEP files are converted with the OpenCASCADE library, installed by Homebrew in Terminal. Use either FreeCAD or OpenCASCADE, not both.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
-        .onAppear { if model.freecad == nil { model.searchFreecad(silent: true) } }
+        .onAppear { if model.config.stepEngine == .freecad, model.freecad == nil { model.searchFreecad(silent: true) } }
     }
 
     private func labelSection(_ type: FileType) -> some View {
@@ -274,17 +318,64 @@ struct SettingsView: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            if let progress = model.progress {
-                ProgressView(value: progress).frame(width: 160)
-            } else if model.busy {
-                ProgressView().controlSize(.small)
+            Button {
+                model.showJournal.toggle()
+            } label: {
+                Label(model.activeJobs > 0 ? "\(model.activeJobs)" : "", systemImage: "list.bullet.rectangle")
             }
+            .buttonStyle(.borderless)
+            .help("Journal")
+            if model.busy { ProgressView().controlSize(.small) }
             Text(model.status).font(.callout).foregroundStyle(.secondary).lineLimit(2)
             Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(minHeight: 36)
+    }
+
+    /// One stream, oldest at the top: finished, the running job (highlighted), then the queued ones.
+    private var journalPanel: some View {
+        ScrollViewReader { reader in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    if model.journal.isEmpty {
+                        Text("Nothing yet. Apply, Clear and `stler follow` show up here.").font(.callout).foregroundStyle(.secondary).padding(8)
+                    }
+                    ForEach(model.journal) { job in journalRow(job).id(job.id) }
+                }
+                .padding(8)
+            }
+            .frame(height: 170)
+            .background(.quaternary.opacity(0.4))
+            .onChange(of: model.journal) { journal in
+                if let target = journal.first(where: { $0.state == .running }) ?? journal.last { reader.scrollTo(target.id) }
+            }
+        }
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private func journalRow(_ job: Job) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            switch job.state {
+            case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            case .running: ProgressView().controlSize(.small)
+            case .queued: Image(systemName: "clock").foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(job.title).font(.callout.weight(job.state == .running ? .semibold : .regular))
+                switch job.state {
+                case .done: Text(job.summary).font(.caption).foregroundStyle(.secondary)
+                case .running:
+                    if job.total > 0 { ProgressView(value: Double(job.done), total: Double(job.total)) }
+                    Text("\(job.done)/\(job.total)  \(job.current)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                case .queued: Text("Waiting").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(6)
+        .background(job.state == .running ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: bindings
@@ -296,7 +387,7 @@ struct SettingsView: View {
     /// STEP reads as off (and cannot be switched on) while FreeCAD is missing.
     private func enabledBinding(_ type: FileType) -> Binding<Bool> {
         Binding(
-            get: { model.config[type].enabled && (type != .step || model.freecad != nil) },
+            get: { model.config[type].enabled && (type != .step || model.stepReady) },
             set: { model.config[type].enabled = $0 })
     }
 

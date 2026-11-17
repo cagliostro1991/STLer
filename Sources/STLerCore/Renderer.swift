@@ -9,7 +9,10 @@ enum IconRenderer {
         var view = ViewAngle.iso
         var projection = Projection.orthographic
         var color = NSColor.systemGray
-        var firstPlateOnly = true
+        /// 3MF: plates to show, 0 = all.
+        var plates = 0
+        /// 0...1: how much of the colours stored in the file replaces `color` (3MF).
+        var modelColors = 0.0
         var label = LabelStyle()
         /// Label text; defaults to the uppercased file extension.
         var labelText: String?
@@ -17,11 +20,12 @@ enum IconRenderer {
         /// Plain render: no label.
         init() { label.corner = .off }
 
-        init(style: TypeStyle, firstPlateOnly: Bool, labelText: String?) {
+        init(style: TypeStyle, labelText: String?) {
             view = style.view
             projection = style.projection
             color = style.nsColor
-            self.firstPlateOnly = firstPlateOnly
+            plates = style.limit
+            modelColors = Double(style.modelColors) / 100
             label = style.label
             self.labelText = labelText
         }
@@ -33,12 +37,15 @@ enum IconRenderer {
     ///   - size: Output size in points.
     /// - Returns: `nil` when the file cannot be read.
     static func render(_ url: URL, size: CGSize, options: Options = Options()) -> NSImage? {
-        guard let scene = loadScene(url, firstPlateOnly: options.firstPlateOnly) else { return nil }
+        guard let scene = loadScene(url, options: options) else { return nil }
 
-        let material = SCNMaterial()
-        material.diffuse.contents = options.color
-        material.lightingModel = .blinn
-        scene.rootNode.enumerateHierarchy { node, _ in node.geometry?.materials = [material] }
+        scene.rootNode.enumerateHierarchy { node, _ in
+            guard let geometry = node.geometry else { return }
+            let material = SCNMaterial()
+            material.diffuse.contents = geometry.sources(for: .color).isEmpty ? options.color : NSColor.white
+            material.lightingModel = .blinn
+            geometry.materials = [material]
+        }
 
         let (low, high) = scene.rootNode.boundingBox
         let center = SCNVector3((low.x + high.x) / 2, (low.y + high.y) / 2, (low.z + high.z) / 2)
@@ -88,7 +95,7 @@ enum IconRenderer {
         return addLabel(to: image, text: options.labelText ?? url.pathExtension.uppercased(), style: options.label)
     }
 
-    private static func loadScene(_ url: URL, firstPlateOnly: Bool) -> SCNScene? {
+    private static func loadScene(_ url: URL, options: Options) -> SCNScene? {
         guard url.pathExtension.lowercased() == "3mf" else {
             let scene = SCNScene(mdlAsset: MDLAsset(url: url))
             scene.rootNode.enumerateHierarchy { node, _ in
@@ -96,7 +103,9 @@ enum IconRenderer {
             }
             return scene
         }
-        guard let node = ThreeMFLoader(url: url, firstPlateOnly: firstPlateOnly).load() else { return nil }
+        let fill = (options.color.usingColorSpace(.sRGB) ?? .gray)
+        let rgb = SIMD3(Float(fill.redComponent), Float(fill.greenComponent), Float(fill.blueComponent))
+        guard let node = ThreeMFLoader(url: url, plates: options.plates, fill: rgb, colorAmount: Float(options.modelColors)).load() else { return nil }
         let scene = SCNScene()
         scene.rootNode.addChildNode(node)
         return scene

@@ -8,47 +8,97 @@ import simd
 /// (Bambu Studio, Orca, Prusa, Fusion). Archive access goes through `/usr/bin/bsdtar`, which handles UTF-8 names.
 final class ThreeMFLoader {
     private struct Component { let id: Int; let path: String?; let transform: simd_double4x4 }
-    private struct Object { var type = "model"; var vertices: [SIMD3<Double>] = []; var triangles: [SIMD3<Int>] = []; var components: [Component] = [] }
+    /// `material` is the (property group id, index) of the object itself; `triangleMaterials` is parallel to `triangles`, `nil` entries inherit.
+    private struct Object {
+        var type = "model"; var vertices: [SIMD3<Double>] = []; var triangles: [SIMD3<Int>] = []; var components: [Component] = []
+        var material: SIMD2<Int>?; var triangleMaterials: [SIMD2<Int>?] = []
+    }
     private struct Item { let id: Int; let path: String?; let transform: simd_double4x4 }
-    private struct Model { var objects: [Int: Object] = [:]; var items: [Item] = [] }
+    private struct Model { var objects: [Int: Object] = [:]; var items: [Item] = []; var colorGroups: [Int: [SIMD3<Float>]] = [:] }
 
     private static let skippedTypes: Set<String> = ["support", "solidsupport", "surface"]
     private static let maxComponentDepth = 16
 
     private let url: URL
-    private let firstPlateOnly: Bool
+    private let plates: Int
     private var models: [String: Model] = [:]
     private var points: [SCNVector3] = []
+    private var colors: [SIMD3<Float>] = []
+    private let fill: SIMD3<Float>
+    private let colorAmount: Float
+    private var filamentColors: [SIMD3<Float>] = []
+    private var objectExtruders: [Int: Int] = [:]
 
-    /// - Parameter firstPlateOnly: For Bambu/Orca projects with several plates, keep only the first plate's objects.
-    init(url: URL, firstPlateOnly: Bool = true) {
+    /// - Parameters:
+    ///   - plates: For Bambu/Orca projects with several plates, keep the objects of the first `plates` plates; 0 keeps all.
+    ///   - fill: Colour (RGB, 0...1) for parts without a colour of their own.
+    ///   - colorAmount: 0...1, how much of the colours stored in the file replaces `fill`. 0 skips reading them.
+    init(url: URL, plates: Int = 1, fill: SIMD3<Float> = SIMD3(repeating: 0.6), colorAmount: Float = 0) {
         self.url = url
-        self.firstPlateOnly = firstPlateOnly
+        self.plates = plates
+        self.fill = fill
+        self.colorAmount = colorAmount
     }
 
     /// - Returns: A node with all printable objects, or `nil` when the package has no readable mesh.
     func load() -> SCNNode? {
         guard let rootPath = rootModelPath(), let root = model(at: rootPath) else { return nil }
-        let plate = firstPlateOnly ? firstPlateObjectIDs() : nil
+        let plate = plates > 0 ? plateObjectIDs() : nil
+        if colorAmount > 0 { loadBambuColors() }
         for item in root.items where plate?.contains(item.id) ?? true {
-            emit(id: item.id, file: item.path ?? rootPath, transform: item.transform, depth: 0)
+            emit(id: item.id, file: item.path ?? rootPath, transform: item.transform, depth: 0, inherited: extruderColor(of: item.id))
         }
         guard !points.isEmpty else { return nil }
-        let geometry = FlatGeometry.make(points: points)
-        return SCNNode(geometry: geometry)
+        return SCNNode(geometry: FlatGeometry.make(points: points, colors: colorAmount > 0 && colors.count == points.count ? colors : nil))
     }
 
-    private func emit(id: Int, file: String, transform: simd_double4x4, depth: Int) {
-        guard depth < Self.maxComponentDepth, let object = model(at: file)?.objects[id], !Self.skippedTypes.contains(object.type) else { return }
-        for triangle in object.triangles where triangle.min() >= 0 && triangle.max() < object.vertices.count {
+    private func emit(id: Int, file: String, transform: simd_double4x4, depth: Int, inherited: SIMD3<Float>?) {
+        guard depth < Self.maxComponentDepth, let model = model(at: file), let object = model.objects[id], !Self.skippedTypes.contains(object.type) else { return }
+        let base = object.material.flatMap { color(model, $0) } ?? inherited
+        for (index, triangle) in object.triangles.enumerated() where triangle.min() >= 0 && triangle.max() < object.vertices.count {
+            let own = index < object.triangleMaterials.count ? object.triangleMaterials[index].flatMap { color(model, $0) } : nil
+            let shade = colorAmount > 0 ? fill + ((own ?? base ?? fill) - fill) * colorAmount : fill
             for corner in 0..<3 {
                 let p = simd_mul(SIMD4(object.vertices[triangle[corner]], 1), transform)
                 points.append(SCNVector3(CGFloat(p.x), CGFloat(p.y), CGFloat(p.z)))
+                if colorAmount > 0 { colors.append(shade) }
             }
         }
         for component in object.components {
-            emit(id: component.id, file: component.path ?? file, transform: simd_mul(component.transform, transform), depth: depth + 1)
+            emit(id: component.id, file: component.path ?? file, transform: simd_mul(component.transform, transform), depth: depth + 1, inherited: base)
         }
+    }
+
+    private func color(_ model: Model, _ material: SIMD2<Int>) -> SIMD3<Float>? {
+        guard let group = model.colorGroups[material.x], group.indices.contains(material.y) else { return nil }
+        return group[material.y]
+    }
+
+    /// Bambu/Orca: filament colours in `project_settings.config`, the filament of each object in `model_settings.config`.
+    private func loadBambuColors() {
+        if let data = archive(["-xOf", url.path, "Metadata/project_settings.config"]),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let list = json["filament_colour"] as? [String] {
+            filamentColors = list.map { Self.parseHex($0) ?? SIMD3(repeating: 0.6) }
+        }
+        if !filamentColors.isEmpty, let data = archive(["-xOf", url.path, "Metadata/model_settings.config"]) {
+            let parser = ExtruderParser()
+            let xml = XMLParser(data: data)
+            xml.delegate = parser
+            xml.parse()
+            objectExtruders = parser.extruders
+        }
+    }
+
+    private func extruderColor(of object: Int) -> SIMD3<Float>? {
+        guard let extruder = objectExtruders[object], filamentColors.indices.contains(extruder - 1) else { return nil }
+        return filamentColors[extruder - 1]
+    }
+
+    /// `#RRGGBB` or `#RRGGBBAA` (alpha ignored).
+    private static func parseHex(_ text: String) -> SIMD3<Float>? {
+        let hex = text.hasPrefix("#") ? String(text.dropFirst()) : text
+        guard hex.count == 6 || hex.count == 8, let value = UInt32(hex.prefix(6), radix: 16) else { return nil }
+        return SIMD3(Float((value >> 16) & 255), Float((value >> 8) & 255), Float(value & 255)) / 255
     }
 
     private func model(at path: String) -> Model? {
@@ -59,16 +109,16 @@ final class ThreeMFLoader {
         let xml = XMLParser(data: data)
         xml.delegate = parser
         guard xml.parse() else { return nil }
-        let model = Model(objects: parser.objects, items: parser.items)
+        let model = Model(objects: parser.objects, items: parser.items, colorGroups: parser.colorGroups)
         models[key] = model
         return model
     }
 
     /// Bambu/Orca list the objects of each plate in `Metadata/model_settings.config`.
-    /// - Returns: Object ids on the first plate, or `nil` for packages without plate metadata.
-    private func firstPlateObjectIDs() -> Set<Int>? {
+    /// - Returns: Object ids on the first `plates` plates, or `nil` for packages without plate metadata.
+    private func plateObjectIDs() -> Set<Int>? {
         guard let data = archive(["-xOf", url.path, "Metadata/model_settings.config"]) else { return nil }
-        let parser = PlateParser()
+        let parser = PlateParser(limit: plates)
         let xml = XMLParser(data: data)
         xml.delegate = parser
         xml.parse()
@@ -94,22 +144,48 @@ final class ThreeMFLoader {
         return process.terminationStatus == 0 ? data : nil
     }
 
-    /// Collects the `object_id`s of the first `<plate>` in `model_settings.config`.
+    /// Collects the `object_id`s of the first `limit` `<plate>`s in `model_settings.config`.
     private final class PlateParser: NSObject, XMLParserDelegate {
         var ids: Set<Int> = []
+        private let limit: Int
+        private var seen = 0
         private var inPlate = false
-        private var done = false
+
+        init(limit: Int) { self.limit = limit }
 
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
-            if name == "plate", !done {
-                inPlate = true
+            if name == "plate" {
+                seen += 1
+                inPlate = seen <= limit
             } else if inPlate, name == "metadata", attributes["key"] == "object_id", let id = attributes["value"].flatMap(Int.init) {
                 ids.insert(id)
             }
         }
 
         func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-            if name == "plate", inPlate { inPlate = false; done = true }
+            if name == "plate" { inPlate = false }
+        }
+    }
+
+    /// Collects the filament (`extruder`, 1-based) of each `<object>` in `model_settings.config`; the ones set on parts are ignored.
+    private final class ExtruderParser: NSObject, XMLParserDelegate {
+        var extruders: [Int: Int] = [:]
+        private var object: Int?
+        private var depth = 0
+
+        func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes a: [String: String]) {
+            if name == "object" {
+                object = a["id"].flatMap(Int.init)
+                depth = 0
+            } else if object != nil, name == "part" {
+                depth += 1
+            } else if let object, depth == 0, name == "metadata", a["key"] == "extruder", let value = a["value"].flatMap(Int.init) {
+                extruders[object] = value
+            }
+        }
+
+        func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
+            if name == "part" { depth -= 1 } else if name == "object" { object = nil }
         }
     }
 
@@ -117,7 +193,9 @@ final class ThreeMFLoader {
     private final class ModelParser: NSObject, XMLParserDelegate {
         var objects: [Int: Object] = [:]
         var items: [Item] = []
+        var colorGroups: [Int: [SIMD3<Float>]] = [:]
         private var current: Int?
+        private var group: Int?
 
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes a: [String: String]) {
             switch name.split(separator: ":").last.map(String.init) ?? name {
@@ -125,6 +203,12 @@ final class ThreeMFLoader {
                 guard let id = a["id"].flatMap(Int.init) else { return }
                 current = id
                 objects[id] = Object(type: a["type"] ?? "model")
+                if let pid = a["pid"].flatMap(Int.init) { objects[id]?.material = SIMD2(pid, a["pindex"].flatMap(Int.init) ?? 0) }
+            case "basematerials", "colorgroup":
+                group = a["id"].flatMap(Int.init)
+                if let group { colorGroups[group] = [] }
+            case "base", "color":
+                if let group, let color = (a["displaycolor"] ?? a["color"]).flatMap(ThreeMFLoader.parseHex) { colorGroups[group]?.append(color) }
             case "vertex":
                 if let id = current, let x = a["x"].flatMap(Double.init), let y = a["y"].flatMap(Double.init), let z = a["z"].flatMap(Double.init) {
                     objects[id]?.vertices.append(SIMD3(x, y, z))
@@ -132,6 +216,7 @@ final class ThreeMFLoader {
             case "triangle":
                 if let id = current, let v1 = a["v1"].flatMap(Int.init), let v2 = a["v2"].flatMap(Int.init), let v3 = a["v3"].flatMap(Int.init) {
                     objects[id]?.triangles.append(SIMD3(v1, v2, v3))
+                    objects[id]?.triangleMaterials.append(a["pid"].flatMap(Int.init).map { SIMD2($0, a["p1"].flatMap(Int.init) ?? 0) })
                 }
             case "component":
                 if let id = current, let target = a["objectid"].flatMap(Int.init) {
@@ -147,7 +232,11 @@ final class ThreeMFLoader {
         }
 
         func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {
-            if (name.split(separator: ":").last.map(String.init) ?? name) == "object" { current = nil }
+            switch name.split(separator: ":").last.map(String.init) ?? name {
+            case "object": current = nil
+            case "basematerials", "colorgroup": group = nil
+            default: break
+            }
         }
 
         /// 3MF stores 12 numbers: the first four rows of a row-vector 4x4 matrix (`v' = v * M`).

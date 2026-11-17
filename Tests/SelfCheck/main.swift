@@ -38,6 +38,54 @@ check(noFreecad.set("step.enabled", "true") != nil && !noFreecad.step.enabled, "
 noFreecad.step.enabled = true
 check(noFreecad.enabledFormats == ["stl", "3mf"], "STEP is ignored while FreeCAD is missing, even if the flag is on")
 check(StepConverter.executable("/bin/echo") == "/bin/echo" && StepConverter.executable("/nonexistent") == nil, "freecadPath must point to an executable")
+var occt = Config()
+check(occt.set("stepEngine", "blender") != nil && occt.set("stepEngine", "opencascade") == nil && occt.stepEngine == .opencascade, "config validates the STEP engine")
+setenv("STLER_OCCT_PREFIX", "/nonexistent-occt", 1)
+occt.freecadPath = "/bin/echo"
+check(!StepConverter.isReady(occt) && occt.set("step.enabled", "true") != nil, "OpenCASCADE engine needs OpenCASCADE, a found FreeCAD does not count")
+setenv("STLER_OCCT_PREFIX", NSTemporaryDirectory(), 1)
+check(StepConverter.isReady(occt) && occt.set("step.enabled", "true") == nil && occt.enabledFormats.contains("step"), "STEP turns on once the chosen engine is there")
+occt.stepEngine = .freecad
+occt.freecadPath = "/nonexistent"
+check(!StepConverter.isReady(occt) && !occt.enabledFormats.contains("step"), "switching back to a missing FreeCAD turns STEP off again")
+unsetenv("STLER_OCCT_PREFIX")
+check(Set(FileScanner.estimate(in: NSTemporaryDirectory()).keys) == Set(FileType.allCases), "estimate counts every file type, also when run in parallel")
+let jobQueue = JobQueue()
+var seenStates: [[Job.State]] = []
+jobQueue.didChange = { seenStates.append(jobQueue.jobs.map(\.state)) }
+let gate = DispatchSemaphore(value: 0)
+var order: [String] = []
+for name in ["first", "second", "third"] {
+    jobQueue.enqueue(name) { reporter in
+        if name == "first" { gate.wait() }
+        reporter.progress(1, 2, "/tmp/\(name).stl")
+        order.append(name)
+        return "done \(name)"
+    }
+}
+check(jobQueue.jobs.map(\.title) == ["first", "second", "third"] && jobQueue.jobs.last?.state == .queued, "enqueue returns at once and the jobs wait in order")
+gate.signal()
+jobQueue.waitUntilIdle()
+check(order == ["first", "second", "third"] && jobQueue.jobs.map(\.summary) == ["done first", "done second", "done third"], "jobs run one by one in the order they were added")
+check(jobQueue.jobs.allSatisfy { $0.state == .done && $0.current.isEmpty && $0.done == 1 && $0.total == 2 }, "finished jobs keep their progress and drop the current file")
+check(seenStates.contains([.done, .running, .queued]), "the journal reads finished, running, queued from top to bottom")
+for index in 0..<15 { jobQueue.enqueue("bulk \(index)") { _ in "ok" } }
+jobQueue.waitUntilIdle()
+check(jobQueue.jobs.count == JobQueue.keepFinished && jobQueue.jobs.last?.title == "bulk 14", "the journal keeps only the last 10 finished jobs")
+let logDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("stler-log-\(UUID().uuidString)")
+setenv("STLER_LOG", logDirectory.appendingPathComponent("activity.json").path, 1)
+var running = ActivityLog.Entry(title: "Finder: ~/a", running: true, done: 1, total: 4, current: "/a/x.stl")
+ActivityLog.upsert(running)
+check(ActivityLog.jobs().map(\.state) == [.running] && ActivityLog.jobs().first?.current == "/a/x.stl", "follow activity shows up as a running job")
+running.running = false; running.summary = "rendered 4"
+ActivityLog.upsert(running)
+check(ActivityLog.jobs().count == 1 && ActivityLog.jobs().first?.state == .done && ActivityLog.jobs().first?.id == running.id, "finishing an entry replaces it instead of adding another")
+for index in 0..<14 { ActivityLog.upsert(ActivityLog.Entry(title: "f\(index)", running: false)) }
+check(ActivityLog.jobs().count == JobQueue.keepFinished && ActivityLog.jobs().last?.title == "f13", "the shared log keeps only the last 10 finished entries")
+try? "not json".write(to: logDirectory.appendingPathComponent("activity.json"), atomically: true, encoding: .utf8)
+check(ActivityLog.jobs().isEmpty, "a broken log file reads as empty")
+unsetenv("STLER_LOG")
+try? FileManager.default.removeItem(at: logDirectory)
 check(c.set("followDepth", "0") != nil, "config rejects depth 0")
 check(c.set("followDepth", "deep") == nil && c.followDepth == 0, "config maps deep to 0")
 check(c.set("stl.label.corner", "middle") != nil && c.set("stl.label.corner", "off") == nil && c.stl.label.corner == .off, "config validates the label corner")
@@ -55,6 +103,9 @@ check(c.set("stl.label.backgroundColor", "#00ff00") == nil && c.set("stl.label.b
 check(c.set("stl.label.opacity", "1.5") != nil && c.set("stl.label.opacity", "0.5") == nil && c.stl.label.opacity == 0.5, "config validates label opacity")
 check(c.set("stl.label.cornerRadius", "51") != nil && c.set("stl.label.cornerRadius", "abc") != nil && c.set("stl.label.cornerRadius", "0") == nil && c.stl.label.cornerRadius == 0, "config validates label corner radius")
 let legacy = try JSONDecoder().decode(Config.self, from: Data(##"{"view":"top","color":"#112233","formats":["stl"],"badge":"off","followDepth":5}"##.utf8))
+let oldPlates = try JSONDecoder().decode(Config.self, from: Data(##"{"stl":{},"firstPlateOnly":false}"##.utf8))
+let oldPlatesOn = try JSONDecoder().decode(Config.self, from: Data(##"{"stl":{},"firstPlateOnly":true}"##.utf8))
+check(oldPlates.threeMF.limit == 0 && oldPlatesOn.threeMF.limit == 1, "the old firstPlateOnly flag becomes the 3MF plate limit")
 check(legacy.stl.enabled && !legacy.threeMF.enabled && !legacy.step.enabled, "legacy formats become the enabled flags")
 check(legacy.stl.view == .top && legacy.threeMF.view == .top && legacy.stl.color == "#112233" && legacy.stl.label.corner == .off && legacy.followDepth == 5, "legacy global view, colour and badge move to every type")
 let tolerant = try JSONDecoder().decode(Config.self, from: Data(##"{"stl":{"view":"sideways","color":"#abcdef","label":{"corner":"middle","opacity":0.3}}}"##.utf8))
@@ -96,8 +147,12 @@ _ = otherType.set("3mf.view", "top")
 _ = otherType.set("followDepth", "1")
 check(Signature.make(for: otherType, type: .stl) == baseSignature, "signature ignores other types and settings that do not change the icon")
 var plateConfig = Config()
-_ = plateConfig.set("firstPlateOnly", "false")
-check(Signature.make(for: plateConfig, type: .threeMF) != Signature.make(for: Config(), type: .threeMF) && Signature.make(for: plateConfig, type: .stl) == baseSignature, "first-plate setting only affects 3MF")
+_ = plateConfig.set("3mf.limit", "all")
+check(Signature.make(for: plateConfig, type: .threeMF) != Signature.make(for: Config(), type: .threeMF) && Signature.make(for: plateConfig, type: .stl) == baseSignature, "the plate limit only affects 3MF")
+var partConfig = Config()
+_ = partConfig.set("step.limit", "20")
+check(Signature.make(for: partConfig, type: .step) != Signature.make(for: Config(), type: .step) && Signature.make(for: partConfig, type: .threeMF) == Signature.make(for: Config(), type: .threeMF), "the part limit only affects STEP")
+check(Config().threeMF.limit == 1 && Config().step.limit == 0 && partConfig.set("step.limit", "0") != nil && partConfig.set("stl.limit", "x") != nil, "limit defaults are 1 plate and all parts, and it is validated")
 check(FileType(path: "/a/Model.STP") == .step && FileType(path: "b.3mf") == .threeMF && FileType(path: "c.obj") == nil, "file types are recognised by extension")
 
 let sigFile = tmp.appendingPathComponent("sig.stl").path
@@ -148,9 +203,82 @@ if let node {
     let (lo, hi) = node.boundingBox
     check(close(lo.x, 10) && close(hi.x, 11) && close(lo.y, 5) && close(hi.y, 6) && close(lo.z, 0) && close(hi.z, 1), "component and item transforms compose (x+10, y+5)")
 }
-check(vertexCount(ThreeMFLoader(url: plated, firstPlateOnly: false).load()) == 24, "all plates when firstPlateOnly is off")
+check(vertexCount(ThreeMFLoader(url: plated, plates: 0).load()) == 24 && vertexCount(ThreeMFLoader(url: plated, plates: 2).load()) == 24 && vertexCount(ThreeMFLoader(url: plated, plates: 1).load()) == 12, "plates: 0 and 2 keep both plates, 1 keeps the first")
 let single = try write3MF("single", plates: false)
 check(vertexCount(ThreeMFLoader(url: single).load()) == 24, "no plate metadata means every build item")
+
+func writeColored3MF(_ name: String, bambu: Bool) throws -> URL {
+    let dir = tmp.appendingPathComponent(name)
+    let materials = bambu ? "" : """
+    <basematerials id="1"><base name="red" displaycolor="#FF0000"/><base name="blue" displaycolor="#0000FF"/></basematerials>
+    """
+    let objectAttributes = bambu ? "" : #" pid="1" pindex="1""#
+    let firstTriangle = bambu ? "" : #" pid="1" p1="0""#
+    try touch("\(dir.path)/3D/3dmodel.model", """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>
+    \(materials)
+    <object id="1" type="model"\(objectAttributes)><mesh><vertices>
+    <vertex x="0" y="0" z="0"/><vertex x="1" y="0" z="0"/><vertex x="0" y="1" z="0"/><vertex x="0" y="0" z="1"/>
+    </vertices><triangles>
+    <triangle v1="0" v2="2" v3="1"\(firstTriangle)/><triangle v1="0" v2="1" v3="3"/><triangle v1="1" v2="2" v3="3"/><triangle v1="2" v2="0" v3="3"/>
+    </triangles></mesh></object>
+    </resources><build><item objectid="1"/></build></model>
+    """)
+    if bambu {
+        try touch("\(dir.path)/Metadata/model_settings.config", #"<config><object id="1"><metadata key="extruder" value="2"/><part id="1"><metadata key="extruder" value="1"/></part></object></config>"#)
+        try touch("\(dir.path)/Metadata/project_settings.config", ##"{"filament_colour":["#FF0000","#00FF00"]}"##)
+    }
+    let out = tmp.appendingPathComponent("\(name).3mf")
+    let zip = Process()
+    zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = dir
+    zip.arguments = ["-qr", out.path, "."]
+    try zip.run()
+    zip.waitUntilExit()
+    return out
+}
+
+func vertexColors(_ node: SCNNode?) -> [SIMD3<Float>] {
+    guard let source = node?.geometry?.sources(for: .color).first else { return [] }
+    return source.data.withUnsafeBytes { raw in
+        (0..<source.vectorCount).map { index in
+            let base = source.dataOffset + index * source.dataStride
+            return SIMD3(raw.load(fromByteOffset: base, as: Float.self), raw.load(fromByteOffset: base + 4, as: Float.self), raw.load(fromByteOffset: base + 8, as: Float.self))
+        }
+    }
+}
+
+let gray = SIMD3<Float>(repeating: 0.6)
+let coloredFile = try writeColored3MF("colored", bambu: false)
+check(vertexColors(ThreeMFLoader(url: coloredFile, fill: gray, colorAmount: 0).load()).isEmpty, "0% model colours adds no colour data")
+let fullColors = vertexColors(ThreeMFLoader(url: coloredFile, fill: gray, colorAmount: 1).load())
+check(fullColors.count == 12 && fullColors[0] == SIMD3(1, 0, 0) && fullColors[3] == SIMD3(0, 0, 1) && fullColors[11] == SIMD3(0, 0, 1), "a triangle colour beats the object colour, the rest take the object colour")
+let halfColors = vertexColors(ThreeMFLoader(url: coloredFile, fill: gray, colorAmount: 0.5).load())
+check(halfColors.count == 12 && close(Double(halfColors[0].x), 0.8) && close(Double(halfColors[0].y), 0.3) && close(Double(halfColors[3].z), 0.8), "50% mixes the model colour with the fill colour")
+let uncolored = try write3MF("uncolored", plates: false)
+check(vertexColors(ThreeMFLoader(url: uncolored, fill: gray, colorAmount: 1).load()).allSatisfy { $0 == gray }, "parts without a colour keep the fill colour")
+let bambuFile = try writeColored3MF("bambu", bambu: true)
+check(vertexColors(ThreeMFLoader(url: bambuFile, fill: gray, colorAmount: 1).load()).allSatisfy { $0 == SIMD3(0, 1, 0) }, "Bambu/Orca: the object's filament colour is used, a part's own extruder is ignored")
+func tintedPixels(_ image: NSImage?) -> (red: Int, blue: Int) {
+    guard let tiff = image?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return (0, 0) }
+    var counts = (red: 0, blue: 0)
+    for x in 0..<rep.pixelsWide { for y in 0..<rep.pixelsHigh {
+        guard let c = rep.colorAt(x: x, y: y), c.alphaComponent > 0.5 else { continue }
+        if c.redComponent > c.blueComponent + 0.25 { counts.red += 1 }
+        if c.blueComponent > c.redComponent + 0.25 { counts.blue += 1 }
+    } }
+    return counts
+}
+var paintOptions = IconRenderer.Options()
+paintOptions.color = NSColor(white: 0.6, alpha: 1)
+let plainPicture = tintedPixels(IconRenderer.render(coloredFile, size: CGSize(width: 128, height: 128), options: paintOptions))
+paintOptions.modelColors = 1
+let paintedPicture = tintedPixels(IconRenderer.render(coloredFile, size: CGSize(width: 128, height: 128), options: paintOptions))
+check(plainPicture.red == 0 && plainPicture.blue == 0 && paintedPicture.red + paintedPicture.blue > 200, "the rendered picture shows the model colours only when asked (red \(paintedPicture.red), blue \(paintedPicture.blue))")
+var colorConfig = Config()
+check(colorConfig.set("3mf.modelColors", "101") != nil && colorConfig.set("3mf.modelColors", "40") == nil && colorConfig.threeMF.modelColors == 40, "model colours are validated 0 to 100")
+check(Signature.make(for: colorConfig, type: .threeMF) != Signature.make(for: Config(), type: .threeMF) && Signature.make(for: colorConfig, type: .stl) == baseSignature, "model colours change only the 3MF signature")
 
 // MARK: end to end
 
@@ -212,7 +340,7 @@ let stopped = IconBatch.apply(batchFiles, config: stopConfig, shouldContinue: { 
 check(stopped.interrupted && stopped.rendered == 1, "a run stops when shouldContinue says so (1 of 3 files rendered)")
 check(IconBatch.apply(batchFiles, config: stopConfig).skipped == 1, "a stopped run resumes where it left off (rendered file skipped)")
 var progressCalls = 0
-_ = IconBatch.apply(batchFiles, config: stopConfig, onProgress: { _, _ in progressCalls += 1 })
+_ = IconBatch.apply(batchFiles, config: stopConfig, onProgress: { _, _, _ in progressCalls += 1 })
 check(progressCalls == 3, "progress is reported once per file")
 let foreign = tmp.appendingPathComponent("foreign.stl").path
 try touch(foreign)
