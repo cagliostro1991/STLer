@@ -69,7 +69,7 @@ enum IconBatch {
     /// The file's type when it is enabled and its icon is missing or out of date.
     private static func staleType(of file: String, config: Config, force: Bool) -> FileType? {
         guard let type = FileType(path: file), config[type].enabled else { return nil }
-        return force || Signature.read(file) != Signature.make(for: config, type: type) ? type : nil
+        return force || Signature.read(file) != Signature.make(for: config, type: type) || !Signature.hasIcon(file) ? type : nil
     }
 
     private static func convertSteps(in files: [String], config: Config, result: inout BatchResult) -> [String: URL] {

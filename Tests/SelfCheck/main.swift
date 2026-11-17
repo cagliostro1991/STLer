@@ -1,6 +1,7 @@
 import AppKit
 import SceneKit
 
+setvbuf(stdout, nil, _IONBF, 0)
 var failures = 0
 
 func check(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -52,7 +53,11 @@ unsetenv("STLER_OCCT_PREFIX")
 check(Set(FileScanner.estimate(in: NSTemporaryDirectory()).keys) == Set(FileType.allCases), "estimate counts every file type, also when run in parallel")
 let jobQueue = JobQueue()
 var seenStates: [[Job.State]] = []
-jobQueue.didChange = { seenStates.append(jobQueue.jobs.map(\.state)) }
+let statesLock = NSLock()
+jobQueue.didChange = {
+    let states = jobQueue.jobs.map(\.state)
+    statesLock.lock(); seenStates.append(states); statesLock.unlock()
+}
 let gate = DispatchSemaphore(value: 0)
 var order: [String] = []
 for name in ["first", "second", "third"] {
@@ -260,6 +265,61 @@ let uncolored = try write3MF("uncolored", plates: false)
 check(vertexColors(ThreeMFLoader(url: uncolored, fill: gray, colorAmount: 1).load()).allSatisfy { $0 == gray }, "parts without a colour keep the fill colour")
 let bambuFile = try writeColored3MF("bambu", bambu: true)
 check(vertexColors(ThreeMFLoader(url: bambuFile, fill: gray, colorAmount: 1).load()).allSatisfy { $0 == SIMD3(0, 1, 0) }, "Bambu/Orca: the object's filament colour is used, a part's own extruder is ignored")
+let benchy3MF = URL(fileURLWithPath: "Sources/STLerApp/Resources/3DBenchy.3mf")
+let oneBoat = vertexCount(ThreeMFLoader(url: benchy3MF, plates: 1).load())
+let sampleColors = vertexColors(ThreeMFLoader(url: benchy3MF, plates: 0, fill: gray, colorAmount: 1).load())
+check(oneBoat > 0 && sampleColors.count == oneBoat * 6, "the bundled 3MF sample has plates of 1, 2 and 3 boats (\(oneBoat) and \(sampleColors.count) corners)")
+check(Set(sampleColors.map { "\($0)" }).count >= 9, "the bundled 3MF sample is painted along three axes")
+let benchyStep = URL(fileURLWithPath: "Sources/STLerApp/Resources/3DBenchy.step")
+if OpenCascade.prefix != nil {
+    var stepConfig = Config()
+    stepConfig.stepEngine = .opencascade
+    let wholeSample = StepConverter.convert([benchyStep.path], config: stepConfig).urls[benchyStep.path]
+    stepConfig.step.limit = 2
+    let someParts = StepConverter.convert([benchyStep.path], config: stepConfig).urls[benchyStep.path]
+    let size: (URL?) -> Int = { $0.flatMap { try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? Int } ?? 0 }
+    check(size(someParts) > 0 && size(someParts) < size(wholeSample), "the bundled STEP sample is an assembly: a part limit shrinks the mesh")
+} else {
+    print("skip  STEP sample check (OpenCASCADE is not installed)")
+}
+let cachedPath = tmp.appendingPathComponent("cached.3mf")
+try FileManager.default.copyItem(at: try write3MF("cache-a", plates: false), to: cachedPath)
+let beforeRewrite = vertexCount(ThreeMFLoader(url: cachedPath).load())
+try FileManager.default.removeItem(at: cachedPath)
+try FileManager.default.copyItem(at: try write3MF("cache-b", plates: true), to: cachedPath)
+check(beforeRewrite == 24 && vertexCount(ThreeMFLoader(url: cachedPath).load()) == 12, "the parsed-package cache follows a file that changes under the same path")
+let cachedTwice = vertexCount(ThreeMFLoader(url: cachedPath, plates: 0).load())
+check(cachedTwice == 24 && vertexCount(ThreeMFLoader(url: cachedPath, plates: 1).load()) == 12, "a cached package still honours different plate limits")
+var followState = FollowState()
+let morning = Date(timeIntervalSince1970: 1_000_000)
+check(followState.shouldScan("/a", modified: morning), "follow scans a folder when it comes to the front")
+check(!followState.shouldScan("/a", modified: morning), "follow leaves an unchanged folder alone")
+check(followState.shouldScan("/a", modified: morning.addingTimeInterval(5)), "follow scans the same folder again when a file was added (its date changed)")
+check(followState.shouldScan("/b", modified: morning.addingTimeInterval(5)) && followState.shouldScan("/a", modified: morning.addingTimeInterval(5)), "follow scans again when another folder comes to the front and back")
+let watched = tmp.appendingPathComponent("watched")
+try FileManager.default.createDirectory(at: watched, withIntermediateDirectories: true)
+let dateBefore = FollowState.modificationDate(of: watched.path)
+Thread.sleep(forTimeInterval: 1.1)
+try "x".write(to: watched.appendingPathComponent("new.stl"), atomically: true, encoding: .utf8)
+check(dateBefore != nil && FollowState.modificationDate(of: watched.path) != dateBefore, "adding a file changes the folder date that follow watches")
+let appFolder = tmp.appendingPathComponent("appfolder")
+try FileManager.default.createDirectory(at: appFolder, withIntermediateDirectories: true)
+let fakeCLI = appFolder.appendingPathComponent("stler")
+check(FollowAgent.cliURL(appBundle: appFolder.appendingPathComponent("STLer.app")) != fakeCLI, "the CLI is not found next to the app when it is not there")
+try "#!/bin/sh\n".write(to: fakeCLI, atomically: true, encoding: .utf8)
+try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeCLI.path)
+check(FollowAgent.cliURL(appBundle: appFolder.appendingPathComponent("STLer.app")) == fakeCLI, "the CLI built next to the app is used for the install")
+check(FollowAgent.state(plistExists: false, binaryExists: false, launchctlOutput: "") == .notInstalled, "no plist means the follow agent is not installed")
+check(FollowAgent.state(plistExists: true, binaryExists: false, launchctlOutput: "state = running") == .notInstalled, "a plist without the installed binary counts as not installed")
+check(FollowAgent.state(plistExists: true, binaryExists: true, launchctlOutput: "") == .stopped && FollowAgent.state(plistExists: true, binaryExists: true, launchctlOutput: "state = waiting") == .stopped, "an installed agent that launchd does not run is stopped")
+check(FollowAgent.state(plistExists: true, binaryExists: true, launchctlOutput: "...\n\tstate = running\n...") == .running, "an installed agent in state running is running")
+let orderDir = tmp.appendingPathComponent("order")
+try FileManager.default.createDirectory(at: orderDir.appendingPathComponent("sub"), withIntermediateDirectories: true)
+let bigFile = orderDir.appendingPathComponent("a-big.stl"), smallFile = orderDir.appendingPathComponent("b-small.stl"), deepFile = orderDir.appendingPathComponent("sub/c.stl")
+try String(repeating: "x", count: 5000).write(to: bigFile, atomically: true, encoding: .utf8)
+try "x".write(to: smallFile, atomically: true, encoding: .utf8)
+try "x".write(to: deepFile, atomically: true, encoding: .utf8)
+check(FileScanner.ordered([deepFile.path, bigFile.path, smallFile.path], under: orderDir.path) == [smallFile.path, bigFile.path, deepFile.path], "a huge model does not hold up the small ones of the same level, and the top level still comes first")
 func tintedPixels(_ image: NSImage?) -> (red: Int, blue: Int) {
     guard let tiff = image?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return (0, 0) }
     var counts = (red: 0, blue: 0)
@@ -322,7 +382,14 @@ var cfg = Config()
 check(IconBatch.apply([stl], config: cfg).rendered == 1, "renders a new file")
 check(mtime() == old, "setting an icon keeps the file's modification date")
 check(Signature.read(stl) != nil, "rendered file carries a signature")
+check(Signature.hasIcon(stl), "a rendered file carries a real custom icon")
 check(IconBatch.apply([stl], config: cfg).skipped == 1, "unchanged file is skipped")
+let strippedFile = tmp.appendingPathComponent("stripped.stl").path
+try FileManager.default.copyItem(atPath: stl, toPath: strippedFile)
+removexattr(strippedFile, "com.apple.ResourceFork", 0)
+removexattr(strippedFile, "com.apple.FinderInfo", 0)
+check(Signature.read(strippedFile) == Signature.make(for: cfg, type: .stl) && !Signature.hasIcon(strippedFile), "a copy can keep our signature but lose the icon")
+check(IconBatch.apply([strippedFile], config: cfg).rendered == 1 && Signature.hasIcon(strippedFile), "a file with the right signature but no icon is rendered again")
 _ = cfg.set("stl.label.corner", "off")
 check(IconBatch.apply([stl], config: cfg).rendered == 1, "changed settings re-render")
 check(IconBatch.apply([stl], config: cfg, force: true).rendered == 1, "force re-renders")

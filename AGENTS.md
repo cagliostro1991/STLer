@@ -10,7 +10,7 @@ A small macOS tool that renders isometric icons for `.stl`, `.3mf` and `.step` f
 
 ```
 make build   # build/stler (CLI) and build/STLer.app (settings window)
-make test    # about 80 checks, a few seconds
+make test    # about 100 checks, around 20 seconds (the bundled 3MF sample is big)
 ```
 
 You only need the Command Line Tools. Tests use temp files and a temp config, they never touch your files.
@@ -21,6 +21,7 @@ You only need the Command Line Tools. Tests use temp files and a temp config, th
 - `Sources/STLerCLI/` argument parsing and commands. The only place that prints.
 - `Sources/STLerApp/` the SwiftUI settings window, built on the same `Config`.
 - `Tests/SelfCheck/main.swift` the tests, a plain executable (no XCTest, that needs Xcode).
+- `Tools/` one-off scripts that generate the bundled 3MF and STEP samples (ADR 0018).
 - `docs/` architecture, ADRs (why), knowledge notes (gotchas and recipes), roadmap (what is left).
 
 Keep directory names apart by more than case. APFS does not care about case and two folders will silently merge.

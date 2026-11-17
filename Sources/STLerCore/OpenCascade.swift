@@ -31,12 +31,8 @@ enum OpenCascade {
             Process.launchedProcess(launchPath: "/usr/bin/open", arguments: ["https://brew.sh"])
             return "Homebrew is not installed. Install it from brew.sh, then press Install again."
         }
-        let script = FileManager.default.temporaryDirectory.appendingPathComponent("stler-install-opencascade.command")
-        let body = "#!/bin/zsh\n\(brew) install opencascade\necho\necho 'Finished. Go back to STLer and press Check again.'\n"
-        guard (try? body.write(to: script, atomically: true, encoding: .utf8)) != nil,
-              (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)) != nil
+        guard TerminalScript.run("\(brew) install opencascade\necho\necho 'Finished. Go back to STLer and press Check again.'", name: "stler-install-opencascade")
         else { return "Could not prepare the install script. Run: brew install opencascade" }
-        Process.launchedProcess(launchPath: "/usr/bin/open", arguments: ["-a", "Terminal", script.path])
         return "Installing in Terminal. When it finishes, press Check again."
     }
 

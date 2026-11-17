@@ -31,12 +31,20 @@ final class SettingsModel: ObservableObject {
         didSet { refreshPreview() }
     }
     @Published private(set) var preview: NSImage?
-    @Published private(set) var sample: URL?
+    /// Sample file per type: the bundled Benchy variants unless the user picked one (remembered in `UserDefaults`).
+    @Published private(set) var samples: [FileType: URL] = [:]
+    /// Why the preview is empty, when it is not just loading.
+    @Published private(set) var previewNote: String?
+    /// True while a preview is being rendered; the first render of a big 3MF takes a couple of seconds.
+    @Published private(set) var previewBusy = false
     @Published private(set) var status = ""
     @Published private(set) var busy = false
     /// The journal as one stream: finished (last 10), running, queued. Includes what `stler follow` did.
     @Published private(set) var journal: [Job] = []
     @Published var showJournal = false
+    /// Whether `stler follow` is installed as a LaunchAgent and running.
+    @Published private(set) var agent = FollowAgent.State.notInstalled
+    @Published var showAgentInfo = false
     @Published var pending: Pending?
     /// Resolved `freecadcmd`, `nil` when FreeCAD cannot be found (STEP is then off and cannot be enabled).
     @Published private(set) var freecad: String?
@@ -52,11 +60,46 @@ final class SettingsModel: ObservableObject {
     private var previewToken = 0
 
     init() {
-        sample = Bundle.main.url(forResource: "3DBenchy", withExtension: "stl")
+        for type in FileType.allCases {
+            let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map { URL(fileURLWithPath: $0) }
+            samples[type] = remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+                ?? Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
+        }
         refreshFreecad()
         refreshPreview()
         jobQueue.didChange = { [weak self] in DispatchQueue.main.async { self?.refreshJournal() } }
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refreshJournal() }
+        refreshAgent()
+        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.refreshAgent() }
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.refreshAgent() }
+    }
+
+    func refreshAgent() {
+        DispatchQueue.global(qos: .utility).async {
+            let state = FollowAgent.state()
+            DispatchQueue.main.async { if state != self.agent { self.agent = state } }
+        }
+    }
+
+    /// Opens Terminal with `stler install`, see `FollowAgent.installInTerminal`.
+    func installFollow() { status = FollowAgent.installInTerminal(appBundle: Bundle.main.bundleURL) }
+
+    /// Stops or starts the installed agent right away, no Terminal needed.
+    func toggleFollow() {
+        let wasRunning = agent == .running
+        status = wasRunning ? "Stopping stler follow ..." : "Starting stler follow ..."
+        DispatchQueue.global(qos: .userInitiated).async {
+            let ok = wasRunning ? FollowAgent.stop() : FollowAgent.start()
+            DispatchQueue.main.async {
+                self.status = ok ? (wasRunning ? "stler follow stopped. It starts again at login, or press Start." : "stler follow started.") : "launchctl refused. Try Reinstall."
+                self.refreshAgent()
+            }
+        }
+    }
+
+    func checkFollow() {
+        refreshAgent()
+        status = "Checking stler follow ..."
     }
 
     /// Merges the window's own jobs with the shared log of `stler follow`: finished ones by time, then running, then queued.
@@ -76,11 +119,26 @@ final class SettingsModel: ObservableObject {
         return .stl
     }
 
+    /// Sample for the open page.
+    var sample: URL? { samples[previewType] }
+
+    /// Whether the open page shows a file the user picked instead of the bundled sample.
+    var hasCustomSample: Bool { sample.map { $0 != Bundle.main.url(forResource: "3DBenchy", withExtension: previewType.sampleExtension) } ?? false }
+
     func chooseSample() {
+        let type = previewType
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = ["stl", "3mf"].compactMap { UTType(filenameExtension: $0) }
+        panel.allowedContentTypes = type.extensions.compactMap { UTType(filenameExtension: $0) }
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        sample = url
+        samples[type] = url
+        UserDefaults.standard.set(url.path, forKey: "sample.\(type.rawValue)")
+        refreshPreview()
+    }
+
+    func resetSample() {
+        let type = previewType
+        UserDefaults.standard.removeObject(forKey: "sample.\(type.rawValue)")
+        samples[type] = Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
         refreshPreview()
     }
 
@@ -113,6 +171,7 @@ final class SettingsModel: ObservableObject {
     func checkOpenCascade() {
         refreshFreecad()
         status = OpenCascade.prefix == nil ? "OpenCASCADE is still not installed." : "OpenCASCADE found."
+        refreshPreview()
     }
 
     /// Searches the usual locations and the Spotlight index for FreeCAD and stores what it finds in the config.
@@ -215,13 +274,24 @@ final class SettingsModel: ObservableObject {
     }
 
     private func refreshPreview() {
-        guard let url = sample else { preview = nil; return }
         previewToken += 1
-        let token = previewToken, type = previewType
+        let token = previewToken, type = previewType, config = config
+        previewBusy = false
+        guard let url = sample else { preview = nil; previewNote = "No sample"; return }
+        if type == .step, !StepConverter.isReady(config) { preview = nil; previewNote = "Choose a STEP engine above to see the preview"; return }
+        previewNote = nil
+        previewBusy = true
         let options = IconRenderer.Options(style: config[type], labelText: type.title)
         queue.async {
-            let image = IconRenderer.render(url, size: CGSize(width: 384, height: 384), options: options)
-            DispatchQueue.main.async { if token == self.previewToken { self.preview = image } }
+            guard token == self.previewToken else { return }
+            let source = type == .step ? StepConverter.convert([url.path], config: config).urls[url.path] : url
+            let image = source.flatMap { IconRenderer.render($0, size: CGSize(width: 384, height: 384), options: options) }
+            DispatchQueue.main.async {
+                guard token == self.previewToken else { return }
+                self.preview = image
+                self.previewBusy = false
+                if image == nil { self.previewNote = "The sample could not be rendered" }
+            }
         }
     }
 }

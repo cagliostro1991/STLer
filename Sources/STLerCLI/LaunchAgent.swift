@@ -2,12 +2,11 @@ import Foundation
 
 /// Keeps `stler follow` running from the user's login session.
 enum LaunchAgent {
-    private static let label = "dev.stler.follow"
-    private static let home = FileManager.default.homeDirectoryForCurrentUser
-    private static let plistURL = home.appendingPathComponent("Library/LaunchAgents/\(label).plist")
-    private static let binaryURL = home.appendingPathComponent(".local/bin/stler")
-    private static let logURL = home.appendingPathComponent("Library/Logs/stler.log")
-    private static var domain: String { "gui/\(getuid())" }
+    private static let label = FollowAgent.label
+    private static let plistURL = FollowAgent.plistURL
+    private static let binaryURL = FollowAgent.binaryURL
+    private static let logURL = FollowAgent.logURL
+    private static var domain: String { FollowAgent.domain }
 
     /// Copies the running binary to `~/.local/bin/stler`, writes the agent plist and loads it.
     static func install() throws {

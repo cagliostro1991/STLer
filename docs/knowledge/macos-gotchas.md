@@ -34,3 +34,12 @@
 - `qlmanage -t` can hang; test thumbnails through `QLThumbnailGenerator` with an alarm.
 - `screencapture` grabs the whole screen, including private windows. Ask the user for a screenshot instead.
 - Editing files with `str.index(anchor)` on a string that occurs twice truncates the file; use unique anchors or rewrite the file.
+
+## `follow` has to notice files added to the folder that is already open
+
+Comparing only the folder path means a file dropped into the open folder is never seen. `FollowState` also compares the folder's modification date (a new or removed entry changes it; icon writes are xattrs and do not). Files added deeper than the top level change a subfolder's date, not the top one, so they are picked up the next time the folder is reopened.
+
+
+## The signature is not proof of an icon
+
+Extended attributes do not always travel together: a copy to another volume, through iCloud or via an archive can keep `dev.stler.sig` and lose the resource fork or the Finder "custom icon" flag. Trusting the signature alone left such files grey for good. `IconBatch` treats a file as up to date only when the signature matches and `Signature.hasIcon` (flag in `com.apple.FinderInfo`, byte 8 bit `0x04`, plus a non-empty `com.apple.ResourceFork`) agrees.

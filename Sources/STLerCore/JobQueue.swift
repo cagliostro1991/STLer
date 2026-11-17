@@ -25,7 +25,7 @@ final class JobQueue {
         let progress: (_ done: Int, _ total: Int, _ file: String) -> Void
     }
 
-    /// Called from the worker thread after every change.
+    /// Called after every change, from the worker thread or from the thread that enqueues; it may run concurrently.
     var didChange: (() -> Void)?
 
     private let lock = NSLock()

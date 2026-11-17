@@ -16,6 +16,14 @@ enum Signature {
         return parts.joined(separator: "|")
     }
 
+    /// Whether the file really carries a custom icon: the Finder "custom icon" flag and an icon in the resource fork.
+    /// The signature alone is not proof: attributes survive some copies and moves only in part (other volumes, iCloud, archives).
+    static func hasIcon(_ path: String) -> Bool {
+        var info = [UInt8](repeating: 0, count: 32)
+        guard getxattr(path, "com.apple.FinderInfo", &info, info.count, 0, 0) == info.count, info[8] & 0x04 != 0 else { return false }
+        return getxattr(path, "com.apple.ResourceFork", nil, 0, 0, 0) > 0
+    }
+
     static func read(_ path: String) -> String? {
         let size = getxattr(path, attribute, nil, 0, 0, 0)
         guard size > 0 else { return nil }

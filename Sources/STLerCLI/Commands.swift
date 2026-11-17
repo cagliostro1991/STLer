@@ -119,14 +119,13 @@ func configure(_ arguments: [String]) throws {
 /// Polls the front Finder window every 2 s and renders each newly opened folder. Never returns.
 /// A long run checks the front folder now and then and gives way when another folder is opened; the signature makes resuming cheap.
 func follow() -> Never {
-    var last: String?
+    var state = FollowState()
     var unavailable = false
     func tick() {
         var folder = FinderFolder.front()
         if folder == nil, !unavailable { print("finder: no front window / no access") }
         unavailable = folder == nil
-        while let current = folder, current != last {
-            last = current
+        while let current = folder, state.shouldScan(current, modified: FollowState.modificationDate(of: current)) {
             var lastCheck = Date()
             var entry: ActivityLog.Entry?
             var lastWrite = Date.distantPast

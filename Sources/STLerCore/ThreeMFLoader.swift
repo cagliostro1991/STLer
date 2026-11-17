@@ -22,6 +22,15 @@ final class ThreeMFLoader {
     private let url: URL
     private let plates: Int
     private var models: [String: Model] = [:]
+
+    /// The parsed models of the last file, so changing a setting in the window does not parse a multi-megabyte package again.
+    private static var cache: (key: String, models: [String: Model])?
+    private static let cacheLock = NSLock()
+
+    private var cacheKey: String {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return "\(url.path)|\((attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)|\(attributes?[.size] as? Int ?? 0)"
+    }
     private var points: [SCNVector3] = []
     private var colors: [SIMD3<Float>] = []
     private let fill: SIMD3<Float>
@@ -38,6 +47,9 @@ final class ThreeMFLoader {
         self.plates = plates
         self.fill = fill
         self.colorAmount = colorAmount
+        Self.cacheLock.lock()
+        if let cached = Self.cache, cached.key == cacheKey { models = cached.models }
+        Self.cacheLock.unlock()
     }
 
     /// - Returns: A node with all printable objects, or `nil` when the package has no readable mesh.
@@ -48,6 +60,9 @@ final class ThreeMFLoader {
         for item in root.items where plate?.contains(item.id) ?? true {
             emit(id: item.id, file: item.path ?? rootPath, transform: item.transform, depth: 0, inherited: extruderColor(of: item.id))
         }
+        Self.cacheLock.lock()
+        Self.cache = (cacheKey, models)
+        Self.cacheLock.unlock()
         guard !points.isEmpty else { return nil }
         return SCNNode(geometry: FlatGeometry.make(points: points, colors: colorAmount > 0 && colors.count == points.count ? colors : nil))
     }

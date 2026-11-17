@@ -28,11 +28,14 @@ enum FileScanner {
         return files
     }
 
-    /// Orders files so the top level of `folder` comes first, then deeper levels; ties keep their order.
+    /// Orders files so the top level of `folder` comes first, then deeper levels; within a level the smaller files come first,
+    /// so one huge model does not keep the quick ones waiting. Ties keep their order.
     static func ordered(_ files: [String], under folder: String) -> [String] {
         let base = (folder as NSString).standardizingPath.count
         func depth(_ file: String) -> Int { file.dropFirst(base).split(separator: "/").count }
-        return files.enumerated().sorted { (depth($0.element), $0.offset) < (depth($1.element), $1.offset) }.map(\.element)
+        func size(_ file: String) -> Int { (try? FileManager.default.attributesOfItem(atPath: file)[.size] as? Int) ?? 0 }
+        let keys = files.map { (depth: depth($0), size: size($0)) }
+        return files.indices.sorted { (keys[$0].depth, keys[$0].size, $0) < (keys[$1].depth, keys[$1].size, $1) }.map { files[$0] }
     }
 
     /// `collect` per path, each ordered top level first, duplicates across paths removed.

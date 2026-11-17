@@ -71,10 +71,10 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 detail
                 Divider()
-                if model.showJournal { journalPanel }
                 footer
             }
             .navigationTitle(title)
+            .toolbar { ToolbarItem(placement: .primaryAction) { agentButton } }
         }
         .frame(minWidth: 780, minHeight: 560)
         .confirmationDialog(confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible, presenting: model.pending) { pending in
@@ -134,6 +134,22 @@ struct SettingsView: View {
                 }
             }
             Section("Follow Finder") {
+                LabeledContent("stler follow") {
+                    Text(followStatusText)
+                        .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
+                }
+                HStack {
+                    if model.agent == .notInstalled {
+                        Button("Install in Terminal") { model.installFollow() }
+                        Button("Check again") { model.checkFollow() }
+                    } else {
+                        Button(model.agent == .running ? "Stop" : "Start") { model.toggleFollow() }
+                        Button("Reinstall in Terminal") { model.installFollow() }
+                    }
+                }
+                Text(Self.followExplanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 Picker("Depth", selection: $model.config.followDepth) {
                     Text("Open folder only").tag(1)
                     ForEach(2...5, id: \.self) { Text("\($0) levels").tag($0) }
@@ -231,7 +247,7 @@ struct SettingsView: View {
 
     /// 3MF: how many plates to show. STEP: how many parts of an assembly (a few big parts read better than hundreds of tiny ones).
     private func limitPicker(_ type: FileType) -> some View {
-        let choices = type == .threeMF ? [1, 2, 3, 4, 6, 8] : [5, 10, 25, 50, 100, 250]
+        let choices = type == .threeMF ? [1, 2, 3] : [5, 10, 25, 50, 100, 250]
         let current = model.config[type].limit
         return Picker(type == .threeMF ? "Plates to show" : "Parts to show", selection: style(type, \.limit)) {
             Text("All").tag(0)
@@ -268,8 +284,10 @@ struct SettingsView: View {
                         .truncationMode(.middle)
                 }
                 HStack {
-                    if !model.stepReady { Button("Install (45 MB download)") { model.installOpenCascade() } }
-                    Button("Check again") { model.checkOpenCascade() }
+                    if !model.stepReady {
+                        Button("Install (45 MB download)") { model.installOpenCascade() }
+                        Button("Check again") { model.checkOpenCascade() }
+                    }
                 }
             }
             Text(model.config.stepEngine == .freecad
@@ -303,21 +321,58 @@ struct SettingsView: View {
                     if let preview = model.preview {
                         Image(nsImage: preview).resizable().scaledToFit()
                     } else {
-                        RoundedRectangle(cornerRadius: 12).fill(.quaternary).overlay(Text("No sample").foregroundStyle(.secondary))
+                        RoundedRectangle(cornerRadius: 12).fill(.quaternary).overlay(Text(model.previewNote ?? "...").font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary).padding(8))
                     }
                 }
                 .frame(width: 200, height: 200)
+                .opacity(model.previewBusy ? 0.45 : 1)
+                .overlay { if model.previewBusy { ProgressView().controlSize(.large) } }
                 HStack {
                     Text(model.sample?.lastPathComponent ?? "No sample").font(.callout).lineLimit(1).truncationMode(.middle)
                     Button("Choose sample...") { model.chooseSample() }.controlSize(.small)
+                    if model.hasCustomSample { Button("Benchy") { model.resetSample() }.controlSize(.small).help("Back to the bundled sample") }
                 }
             }
             Spacer()
         }
     }
 
+    private static let followExplanation = "stler follow is a small background helper. When you open a folder in Finder it gives new and changed STL, 3MF and STEP files their icons right away, so you do not have to press Apply. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
+
+    private var followStatusText: String {
+        model.agent == .running ? "Running" : model.agent == .stopped ? "Installed, not running" : "Not installed"
+    }
+
+    /// Header reminder: a green tick when `stler follow` runs as a LaunchAgent, an orange warning when it is missing or stopped.
+    /// Click shows what it is and leads to General, where it can be installed.
+    private var agentButton: some View {
+        Button { model.showAgentInfo.toggle() } label: {
+            Label("stler", systemImage: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
+        }
+        .help(model.agent == .running ? "stler follow is installed and running" : "stler follow is not running")
+        .popover(isPresented: $model.showAgentInfo, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("stler follow: \(followStatusText.lowercased())", systemImage: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.headline)
+                    .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
+                Text(Self.followExplanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Button(model.agent == .running ? "Open General" : "Set up in General") {
+                    model.showAgentInfo = false
+                    model.page = .general
+                }
+            }
+            .padding(14)
+            .frame(width: 340)
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
+            if model.busy { ProgressView().controlSize(.small) }
+            Text(model.status).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+            Spacer()
             Button {
                 model.showJournal.toggle()
             } label: {
@@ -325,9 +380,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.borderless)
             .help("Journal")
-            if model.busy { ProgressView().controlSize(.small) }
-            Text(model.status).font(.callout).foregroundStyle(.secondary).lineLimit(2)
-            Spacer()
+            .popover(isPresented: $model.showJournal, arrowEdge: .top) { journalPanel }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -346,13 +399,11 @@ struct SettingsView: View {
                 }
                 .padding(8)
             }
-            .frame(height: 170)
-            .background(.quaternary.opacity(0.4))
+            .frame(width: 460, height: 320)
             .onChange(of: model.journal) { journal in
                 if let target = journal.first(where: { $0.state == .running }) ?? journal.last { reader.scrollTo(target.id) }
             }
         }
-        .overlay(alignment: .top) { Divider() }
     }
 
     private func journalRow(_ job: Job) -> some View {

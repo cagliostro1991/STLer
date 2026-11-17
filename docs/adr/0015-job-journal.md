@@ -11,7 +11,7 @@ Apply and Clear blocked the window until they finished, and there was no way to 
 
 `JobQueue` (Core) runs jobs one at a time on a background queue. A click only adds a job, so the buttons never lock and a second Apply (say another file type) is queued behind the first. Order matters, because Apply then Clear of the same type must not run in parallel.
 
-The journal is one stream, oldest at the top: the last 10 finished jobs, the running one (highlighted, with progress and the file in work), then the queued ones. `stler follow` writes its folder runs to `~/Library/Logs/STLer/activity.json` (`ActivityLog`, `flock`, last 10 finished entries, `STLER_LOG` overrides the path). The window polls that file once a second and merges it into the same stream.
+The journal is one stream, oldest at the top: the last 10 finished jobs, the running one (highlighted, with progress and the file in work), then the queued ones. `stler follow` writes its folder runs to `~/Library/Logs/STLer/activity.json` (`ActivityLog`, `flock`, last 10 finished entries, `STLER_LOG` overrides the path). The window polls that file once a second and merges it into the same stream. It opens as a popover from the journal button in the footer, so it never pushes the page content around.
 
 ## Consequences
 

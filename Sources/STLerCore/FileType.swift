@@ -17,6 +17,9 @@ enum FileType: String, CaseIterable {
     }
 
     /// Name shown in the UI and on the icon label.
+    /// Extension of the bundled `3DBenchy` sample for this type.
+    var sampleExtension: String { rawValue }
+
     var title: String { self == .threeMF ? "3MF" : rawValue.uppercased() }
 
     init?(path: String) {
