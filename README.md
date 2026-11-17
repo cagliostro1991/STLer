@@ -88,4 +88,4 @@ CLI flags override the config for one run.
 ## Credits
 
 - App icon artwork (`icons/`) was generated with Gemini.
-- Preview model: [3DBenchy](https://www.3dbenchy.com/) by Creative Tools.
+- 3DBenchy by Creative Tools ([public domain](https://www.3dbenchy.com/license/)) is the preview model in the README and the default sample in the settings window (`Sources/STLerApp/Resources/3DBenchy.stl`, unmodified).

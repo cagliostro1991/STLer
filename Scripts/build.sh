@@ -12,6 +12,7 @@ swiftc -O -parse-as-library Sources/STLerCore/*.swift Sources/STLerApp/*.swift -
 
 iconutil -c icns icons/macOS/AppIcon.iconset -o $APP/Contents/Resources/AppIcon.icns
 cp Sources/STLerApp/Info.plist $APP/Contents/Info.plist
+cp Sources/STLerApp/Resources/3DBenchy.stl $APP/Contents/Resources/
 
 codesign -f -s - $APP
 codesign -f -s - build/stler

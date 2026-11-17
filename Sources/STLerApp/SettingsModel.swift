@@ -24,10 +24,7 @@ final class SettingsModel: ObservableObject {
     private var previewToken = 0
 
     init() {
-        if let folder = FinderFolder.front() {
-            let formats = config.formats.filter { $0 != "step" }
-            sample = FileScanner.collect([folder], formats: formats, maxDepth: 2).first.map { URL(fileURLWithPath: $0) }
-        }
+        sample = Bundle.main.url(forResource: "3DBenchy", withExtension: "stl")
         refreshPreview()
     }
 
