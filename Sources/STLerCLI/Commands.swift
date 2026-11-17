@@ -7,27 +7,32 @@ struct CLIError: Error {
 
 let usage = """
 usage:
-  stler [run] [--view V] [--color system|#RRGGBB] [--force|--no-force] [--depth N|deep]
-         [--badge off|topLeft|topRight|bottomLeft|bottomRight] [--dry-run] [<folder|file>...]
+  stler [run] [--view V] [--projection orthographic|perspective] [--color system|#RRGGBB]
+        [--label off|topLeft|topRight|bottomLeft|bottomRight] [--depth N|deep] [--force] [--dry-run] [<folder|file>...]
   stler follow                 render the folder in front in Finder, down to config followDepth
   stler install | uninstall    LaunchAgent that keeps `follow` running at login
-  stler reset [--all] [<folder|file>...]
+  stler reset <folder|file>... remove icons set by stler
   stler config get [key] | set <key> <value>
 views: iso front back left right top bottom
-keys:  view color formats firstPlateOnly force followDepth badge freecadPath watch
-run without paths uses the folder open in Finder (fallback: cwd) first, then config `watch`.
-run skips files already rendered with the same settings; force (config or flag) re-renders everything.
+keys:  firstPlateOnly followDepth freecadPath scope scopeFolders (comma list)
+       <type>.enabled <type>.view <type>.projection <type>.color
+       <type>.label.corner|textColor|backgroundColor|cornerRadius|opacity     (type: stl, 3mf, step)
+run flags change every enabled type for this run only; without paths run uses the folder open in Finder (fallback: cwd).
+run skips files already rendered with the same settings; --force re-renders them.
 followDepth: 1 = only the open folder, 2, 3... = levels of subfolders, deep = unlimited.
-reset removes only icons set by stler (--all adds config `watch`).
+reset removes only icons set by stler.
 """
 
-/// Flags shared by `run` and `reset`, applied on top of the saved config.
+/// Flags for `run` and `reset`, applied on top of the saved config for one run.
 struct RunOptions {
     var config: Config
     var maxDepth: Int?
+    var force = false
     var dryRun = false
-    var all = false
     var paths: [String] = []
+
+    /// Flags that set one per-type key on every type.
+    private static let typeFlags = ["--view": "view", "--projection": "projection", "--color": "color", "--label": "label.corner"]
 
     init(parsing arguments: [String], base: Config) throws {
         config = base
@@ -38,16 +43,17 @@ struct RunOptions {
         }
         while let argument = iterator.next() {
             switch argument {
-            case "--view", "--color", "--badge":
-                if let error = config.set(String(argument.dropFirst(2)), try value(for: argument)) { throw CLIError(error) }
+            case _ where Self.typeFlags[argument] != nil:
+                let text = try value(for: argument)
+                for type in FileType.allCases {
+                    if let error = config.set("\(type.rawValue).\(Self.typeFlags[argument]!)", text) { throw CLIError(error) }
+                }
             case "--depth":
                 var probe = Config()
                 if let error = probe.set("followDepth", try value(for: argument)) { throw CLIError(error) }
                 maxDepth = probe.maxDepth
-            case "--force": config.force = true
-            case "--no-force": config.force = false
+            case "--force": force = true
             case "--dry-run": dryRun = true
-            case "--all": all = true
             default: paths.append(argument)
             }
         }
@@ -64,14 +70,14 @@ func runIcons(_ arguments: [String]) throws {
     if paths.isEmpty {
         let folder = FinderFolder.front() ?? FileManager.default.currentDirectoryPath
         print("active folder: \(folder)")
-        paths = [folder] + options.config.watch
+        paths = [folder]
     }
-    let files = FileScanner.scan(paths, formats: options.config.formats, maxDepth: options.maxDepth)
+    let files = FileScanner.scan(paths, formats: options.config.enabledFormats, maxDepth: options.maxDepth)
     if options.dryRun {
         files.forEach { print($0) }
         return
     }
-    let result = IconBatch.apply(files, config: options.config) { done, total in
+    let result = IconBatch.apply(files, config: options.config, force: options.force) { done, total in
         if done % 25 == 0 { print("[\(done)/\(total)]") }
     }
     result.messages.forEach { print($0) }
@@ -80,9 +86,8 @@ func runIcons(_ arguments: [String]) throws {
 
 func reset(_ arguments: [String]) throws {
     let options = try RunOptions(parsing: arguments, base: Config.load())
-    let paths = options.paths + (options.all ? options.config.watch : [])
-    guard !paths.isEmpty else { throw CLIError(usage) }
-    let result = IconBatch.reset(FileScanner.scan(paths, formats: Array(Config.supportedFormats)))
+    guard !options.paths.isEmpty else { throw CLIError(usage) }
+    let result = IconBatch.reset(FileScanner.scan(options.paths, formats: FileType.allCases.map(\.rawValue)))
     print("reset \(result.reset), untouched \(result.untouched) (no stler signature)")
 }
 
@@ -90,13 +95,17 @@ func configure(_ arguments: [String]) throws {
     var config = Config.load()
     switch arguments.first {
     case "get":
-        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config)) as? [String: Any] ?? [:]
+        var value: Any = try JSONSerialization.jsonObject(with: JSONEncoder().encode(config))
         if arguments.count > 1 {
-            guard let value = object[arguments[1]] else { throw CLIError("unknown key `\(arguments[1])`") }
-            print(value)
+            for part in arguments[1].split(separator: ".") {
+                guard let next = (value as? [String: Any])?[String(part)] else { throw CLIError("unknown key `\(arguments[1])`") }
+                value = next
+            }
+        }
+        if JSONSerialization.isValidJSONObject(value) {
+            print(String(decoding: try JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .sortedKeys]), as: UTF8.self))
         } else {
-            let json = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
-            print(String(decoding: json, as: UTF8.self))
+            print(value)
         }
     case "set":
         guard arguments.count >= 3 else { throw CLIError(usage) }
@@ -108,16 +117,26 @@ func configure(_ arguments: [String]) throws {
 }
 
 /// Polls the front Finder window every 2 s and renders each newly opened folder. Never returns.
+/// A long run checks the front folder now and then and gives way when another folder is opened; the signature makes resuming cheap.
 func follow() -> Never {
     var last: String?
     var unavailable = false
     func tick() {
-        let folder = FinderFolder.front()
+        var folder = FinderFolder.front()
         if folder == nil, !unavailable { print("finder: no front window / no access") }
         unavailable = folder == nil
-        guard let folder, folder != last else { return }
-        last = folder
-        print("\(folder): \(summary(IconBatch.applyToFolder(folder, config: Config.load())))")
+        while let current = folder, current != last {
+            last = current
+            var lastCheck = Date()
+            let result = IconBatch.applyToFolder(current, config: Config.load(), shouldContinue: {
+                guard Date().timeIntervalSince(lastCheck) > 1.5 else { return true }
+                lastCheck = Date()
+                let front = FinderFolder.front()
+                return front == nil || front == current
+            })
+            print("\(current): \(summary(result))\(result.interrupted ? " (interrupted, another folder opened)" : "")")
+            folder = result.interrupted ? FinderFolder.front() : nil
+        }
     }
     tick()
     Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in tick() }

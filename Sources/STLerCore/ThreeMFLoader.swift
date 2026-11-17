@@ -34,23 +34,8 @@ final class ThreeMFLoader {
             emit(id: item.id, file: item.path ?? rootPath, transform: item.transform, depth: 0)
         }
         guard !points.isEmpty else { return nil }
-        let geometry = SCNGeometry(
-            sources: [SCNGeometrySource(vertices: points), SCNGeometrySource(normals: flatNormals())],
-            elements: [SCNGeometryElement(indices: (0..<Int32(points.count)).map { $0 }, primitiveType: .triangles)])
+        let geometry = FlatGeometry.make(points: points)
         return SCNNode(geometry: geometry)
-    }
-
-    /// One normal per triangle corner, so the model renders faceted like a slicer preview.
-    private func flatNormals() -> [SCNVector3] {
-        func vector(_ p: SCNVector3) -> SIMD3<Double> { SIMD3(Double(p.x), Double(p.y), Double(p.z)) }
-        var normals: [SCNVector3] = []
-        for i in stride(from: 0, to: points.count, by: 3) {
-            let a = vector(points[i])
-            let n = simd_normalize(simd_cross(vector(points[i + 1]) - a, vector(points[i + 2]) - a))
-            let normal = SCNVector3(CGFloat(n.x), CGFloat(n.y), CGFloat(n.z))
-            normals += [normal, normal, normal]
-        }
-        return normals
     }
 
     private func emit(id: Int, file: String, transform: simd_double4x4, depth: Int) {

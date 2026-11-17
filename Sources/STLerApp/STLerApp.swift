@@ -8,6 +8,6 @@ struct STLerApp: App {
         Window("STLer", id: "settings") {
             SettingsView(model: model)
         }
-        .windowResizability(.contentSize)
+        .defaultSize(width: 880, height: 660)
     }
 }

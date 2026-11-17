@@ -7,23 +7,27 @@ import SceneKit.ModelIO
 enum IconRenderer {
     struct Options {
         var view = ViewAngle.iso
+        var projection = Projection.orthographic
         var color = NSColor.systemGray
         var firstPlateOnly = true
-        var badge = BadgeCorner.off
+        var label = LabelStyle()
         /// Label text; defaults to the uppercased file extension.
-        var badgeText: String?
+        var labelText: String?
 
-        init() {}
+        /// Plain render: no label.
+        init() { label.corner = .off }
 
-        init(config: Config) {
-            view = config.view
-            color = config.nsColor
-            firstPlateOnly = config.firstPlateOnly
-            badge = config.badge
+        init(style: TypeStyle, firstPlateOnly: Bool, labelText: String?) {
+            view = style.view
+            projection = style.projection
+            color = style.nsColor
+            self.firstPlateOnly = firstPlateOnly
+            label = style.label
+            self.labelText = labelText
         }
     }
 
-    /// Renders a model with an orthographic camera.
+    /// Renders a model from a standard view, orthographic or perspective.
     /// - Parameters:
     ///   - url: STL or 3MF file. STEP has to be converted first, see `StepConverter`.
     ///   - size: Output size in points.
@@ -41,15 +45,26 @@ enum IconRenderer {
         let (dx, dy, dz) = (high.x - low.x, high.y - low.y, high.z - low.z)
         let radius = (dx * dx + dy * dy + dz * dz).squareRoot() / 2
 
+        let direction = options.view.cameraDirection
+        let length = (direction.x * direction.x + direction.y * direction.y + direction.z * direction.z).squareRoot()
         let camera = SCNCamera()
-        camera.usesOrthographicProjection = true
-        camera.orthographicScale = Double(radius) * 1.05
-        camera.zNear = 0.01
-        camera.zFar = Double(radius) * 10
+        let distance: CGFloat
+        switch options.projection {
+        case .orthographic:
+            camera.usesOrthographicProjection = true
+            camera.orthographicScale = Double(radius) * 1.05
+            camera.zNear = 0.01
+            camera.zFar = Double(radius) * 10
+            distance = radius * 3
+        case .perspective:
+            camera.fieldOfView = 30
+            distance = radius * 1.05 / CGFloat(sin(15.0 * Double.pi / 180))
+            camera.zNear = Double(max(distance - radius * 1.5, 0.01))
+            camera.zFar = Double(distance + radius * 1.5)
+        }
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        let direction = options.view.cameraDirection
-        let reach = radius * 3 / (direction.x * direction.x + direction.y * direction.y + direction.z * direction.z).squareRoot()
+        let reach = distance / length
         cameraNode.position = SCNVector3(center.x + direction.x * reach, center.y + direction.y * reach, center.z + direction.z * reach)
         scene.rootNode.addChildNode(cameraNode)
         cameraNode.look(at: center, up: options.view.cameraUp, localFront: SCNVector3(0, 0, -1))
@@ -57,8 +72,8 @@ enum IconRenderer {
         let key = SCNNode()
         key.light = SCNLight()
         key.light?.type = .omni
-        key.position = SCNVector3(cameraNode.position.x + radius, cameraNode.position.y - radius, cameraNode.position.z + radius)
-        scene.rootNode.addChildNode(key)
+        key.position = SCNVector3(-radius * 1.5, radius * 1.5, 0)
+        cameraNode.addChildNode(key)
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
@@ -69,32 +84,41 @@ enum IconRenderer {
         renderer.scene = scene
         renderer.pointOfView = cameraNode
         let image = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
-        guard options.badge != .off else { return image }
-        return addBadge(to: image, text: options.badgeText ?? url.pathExtension.uppercased(), corner: options.badge)
+        guard options.label.corner != .off else { return image }
+        return addLabel(to: image, text: options.labelText ?? url.pathExtension.uppercased(), style: options.label)
     }
 
     private static func loadScene(_ url: URL, firstPlateOnly: Bool) -> SCNScene? {
-        guard url.pathExtension.lowercased() == "3mf" else { return SCNScene(mdlAsset: MDLAsset(url: url)) }
+        guard url.pathExtension.lowercased() == "3mf" else {
+            let scene = SCNScene(mdlAsset: MDLAsset(url: url))
+            scene.rootNode.enumerateHierarchy { node, _ in
+                if let geometry = node.geometry, let corners = FlatGeometry.corners(of: geometry) { node.geometry = FlatGeometry.make(points: corners) }
+            }
+            return scene
+        }
         guard let node = ThreeMFLoader(url: url, firstPlateOnly: firstPlateOnly).load() else { return nil }
         let scene = SCNScene()
         scene.rootNode.addChildNode(node)
         return scene
     }
 
-    private static func addBadge(to image: NSImage, text: String, corner: BadgeCorner) -> NSImage {
+    private static func addLabel(to image: NSImage, text: String, style: LabelStyle) -> NSImage {
         let size = image.size
         return NSImage(size: size, flipped: false) { rect in
             image.draw(in: rect)
-            let label = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size.height * 0.11, weight: .bold), .foregroundColor: NSColor.white])
+            let alpha = CGFloat(style.opacity)
+            let textColor = (Config.parseColor(style.textColor) ?? .white).withAlphaComponent(alpha)
+            let label = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size.height * 0.11, weight: .bold), .foregroundColor: textColor])
             let textSize = label.size()
             let padX = size.height * 0.035, padY = size.height * 0.02, margin = size.height * 0.03
             let (width, height) = (textSize.width + padX * 2, textSize.height + padY * 2)
-            let isLeft = corner == .topLeft || corner == .bottomLeft
-            let isTop = corner == .topLeft || corner == .topRight
+            let isLeft = style.corner == .topLeft || style.corner == .bottomLeft
+            let isTop = style.corner == .topLeft || style.corner == .topRight
             let x = isLeft ? margin : size.width - width - margin
             let y = isTop ? size.height - height - margin : margin
-            NSColor(white: 0.15, alpha: 0.85).setFill()
-            NSBezierPath(roundedRect: CGRect(x: x, y: y, width: width, height: height), xRadius: height / 2, yRadius: height / 2).fill()
+            let radius = height * CGFloat(style.cornerRadius) / 100
+            (Config.parseColor(style.backgroundColor) ?? .black).withAlphaComponent(alpha).setFill()
+            NSBezierPath(roundedRect: CGRect(x: x, y: y, width: width, height: height), xRadius: radius, yRadius: radius).fill()
             label.draw(at: CGPoint(x: x + padX, y: y + padY))
             return true
         }

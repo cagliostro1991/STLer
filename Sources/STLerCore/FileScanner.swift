@@ -42,4 +42,34 @@ enum FileScanner {
             .flatMap { ordered(collect([$0], formats: formats, maxDepth: maxDepth), under: $0) }
             .filter { seen.insert($0).inserted }
     }
+
+    /// Model files of one type under `folder` from the Spotlight index: instant even on a huge folder, but files the index
+    /// has not seen are missed, so treat it as an estimate. Library folders, hidden folders and app packages are left out.
+    static func spotlight(_ type: FileType, in folder: String) -> [String] {
+        let query = type.extensions.map { "kMDItemFSName == \"*.\($0)\"c" }.joined(separator: " || ")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/mdfind")
+        process.arguments = ["-onlyin", folder, query]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter(isUserFile)
+    }
+
+    /// Spotlight-based file counts per type under `folder`.
+    static func estimate(in folder: String) -> [FileType: Int] {
+        Dictionary(uniqueKeysWithValues: FileType.allCases.map { ($0, spotlight($0, in: folder).count) })
+    }
+
+    /// False for files inside hidden folders, `Library` and package-like folders (apps, bundles, photo libraries).
+    static func isUserFile(_ path: String) -> Bool {
+        let packageSuffixes = [".app", ".bundle", ".framework", ".photoslibrary"]
+        let components = path.split(separator: "/")
+        return !components.contains { component in
+            component.hasPrefix(".") || component == "Library" || packageSuffixes.contains { component.hasSuffix($0) }
+        }
+    }
 }

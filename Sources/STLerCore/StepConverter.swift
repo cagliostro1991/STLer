@@ -2,7 +2,12 @@ import Foundation
 
 /// Optional STEP support: converts STEP/STP files to cached STL through FreeCAD's headless `freecadcmd`.
 enum StepConverter {
-    private static let defaultPath = "/Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd"
+    private static let knownLocations = [
+        "/Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd",
+        "~/Applications/FreeCAD.app/Contents/Resources/bin/freecadcmd",
+        "/opt/homebrew/bin/freecadcmd",
+        "/usr/local/bin/freecadcmd",
+    ]
     private static let cacheDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches/stler")
 
     private static let script = """
@@ -16,11 +21,31 @@ enum StepConverter {
             print("stler-fail", job["in"], e)
     """
 
-    /// - Parameter custom: `freecadPath` from the config; empty means the default install location.
-    /// - Returns: Path of an executable `freecadcmd`, or `nil` when FreeCAD is not installed.
+    /// - Parameter custom: `freecadPath` from the config; empty means the usual install locations.
+    /// - Returns: Path of an executable `freecadcmd`, or `nil` when it cannot be found there. Cheap: only file checks.
     static func executable(_ custom: String) -> String? {
-        let path = custom.isEmpty ? defaultPath : (custom as NSString).expandingTildeInPath
-        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+        if !custom.isEmpty {
+            let path = (custom as NSString).expandingTildeInPath
+            return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+        }
+        return knownLocations.map { ($0 as NSString).expandingTildeInPath }.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    /// `executable("")` plus a Spotlight search for any `FreeCAD*.app` (weekly builds, other folders). Slower, call off the main thread.
+    static func search() -> String? {
+        if let known = executable("") { return known }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/mdfind")
+        process.arguments = [#"kMDItemFSName == "FreeCAD*.app"c"#]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).split(separator: "\n")
+            .map { "\($0)/Contents/Resources/bin/freecadcmd" }
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     static func isStep(_ path: String) -> Bool {

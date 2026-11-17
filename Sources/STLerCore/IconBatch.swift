@@ -5,6 +5,8 @@ struct BatchResult {
     var rendered = 0
     var skipped = 0
     var failed = 0
+    /// The run stopped early because `shouldContinue` returned false.
+    var interrupted = false
     var messages: [String] = []
 }
 
@@ -12,23 +14,27 @@ struct BatchResult {
 enum IconBatch {
     private static let iconSize = CGSize(width: 512, height: 512)
 
-    /// Renders and stamps every file whose signature differs from the current settings (all files with `config.force`).
-    /// - Parameter onProgress: Called once per file with the number of files handled so far and the total.
-    static func apply(_ files: [String], config: Config, onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil) -> BatchResult {
-        let signature = Signature.make(for: config)
+    /// Renders and stamps every file of an enabled type whose signature differs from the current settings of its type
+    /// (all of them with `force`).
+    /// - Parameters:
+    ///   - onProgress: Called once per file with the number of files handled so far and the total.
+    ///   - shouldContinue: Asked before each file; returning false stops the run (`interrupted` is set).
+    static func apply(_ files: [String], config: Config, force: Bool = false, onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
         var result = BatchResult()
-        let stale = files.filter { config.force || Signature.read($0) != signature }
+        let stale = files.filter { staleType(of: $0, config: config, force: force) != nil }
         let converted = convertSteps(in: stale, config: config, result: &result)
 
         for (index, file) in files.enumerated() {
+            if let shouldContinue, !shouldContinue() {
+                result.interrupted = true
+                break
+            }
             onProgress?(index + 1, files.count)
-            if !config.force, Signature.read(file) == signature { result.skipped += 1; continue }
-            let isStep = StepConverter.isStep(file)
-            var options = IconRenderer.Options(config: config)
-            if isStep { options.badgeText = "STEP" }
-            guard let source = isStep ? converted[file] : URL(fileURLWithPath: file),
+            guard let type = staleType(of: file, config: config, force: force) else { result.skipped += 1; continue }
+            let options = IconRenderer.Options(style: config[type], firstPlateOnly: config.firstPlateOnly, labelText: type.title)
+            guard let source = type == .step ? converted[file] : URL(fileURLWithPath: file),
                   let image = IconRenderer.render(source, size: iconSize, options: options),
-                  setIcon(image, on: file, signature: signature) else {
+                  setIcon(image, on: file, signature: Signature.make(for: config, type: type)) else {
                 result.failed += 1
                 result.messages.append("failed: \(file)")
                 continue
@@ -39,8 +45,8 @@ enum IconBatch {
     }
 
     /// `apply` for one folder, down to `config.followDepth`, top level first.
-    static func applyToFolder(_ folder: String, config: Config) -> BatchResult {
-        apply(FileScanner.scan([folder], formats: config.formats, maxDepth: config.maxDepth), config: config)
+    static func applyToFolder(_ folder: String, config: Config, onProgress: ((_ done: Int, _ total: Int) -> Void)? = nil, shouldContinue: (() -> Bool)? = nil) -> BatchResult {
+        apply(FileScanner.scan([folder], formats: config.enabledFormats, maxDepth: config.maxDepth), config: config, onProgress: onProgress, shouldContinue: shouldContinue)
     }
 
     /// Removes only icons carrying our signature, so icons set by the user stay.
@@ -56,6 +62,12 @@ enum IconBatch {
         }
         resetQuickLookCache()
         return (done, files.count - done)
+    }
+
+    /// The file's type when it is enabled and its icon is missing or out of date.
+    private static func staleType(of file: String, config: Config, force: Bool) -> FileType? {
+        guard let type = FileType(path: file), config[type].enabled else { return nil }
+        return force || Signature.read(file) != Signature.make(for: config, type: type) ? type : nil
     }
 
     private static func convertSteps(in files: [String], config: Config, result: inout BatchResult) -> [String: URL] {

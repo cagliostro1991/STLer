@@ -23,7 +23,12 @@ enum ViewAngle: String, CaseIterable, Codable {
     }
 }
 
+/// Camera projection used for the render.
+enum Projection: String, CaseIterable, Codable {
+    case orthographic, perspective
+}
+
 /// Corner of the format label drawn on the icon, or `off`.
-enum BadgeCorner: String, CaseIterable, Codable {
+enum LabelCorner: String, CaseIterable, Codable {
     case off, topLeft, topRight, bottomLeft, bottomRight
 }

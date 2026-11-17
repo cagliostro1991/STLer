@@ -5,9 +5,15 @@ import Foundation
 enum Signature {
     private static let attribute = "dev.stler.sig"
 
-    /// Fingerprint of every setting that changes the icon. Bump the prefix when the renderer output changes.
-    static func make(for config: Config) -> String {
-        "v3|\(config.view.rawValue)|\(config.color)|\(config.firstPlateOnly)|\(config.badge.rawValue)"
+    /// Fingerprint of every setting that changes the icon of one file type, so changing one type never re-renders another.
+    /// Bump the prefix when the renderer output changes.
+    static func make(for config: Config, type: FileType) -> String {
+        let style = config[type]
+        let label = style.label
+        var parts = ["v5", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color]
+        if type == .threeMF { parts.append(String(config.firstPlateOnly)) }
+        parts += [label.corner.rawValue, label.textColor, label.backgroundColor, String(label.cornerRadius), String(label.opacity)]
+        return parts.joined(separator: "|")
     }
 
     static func read(_ path: String) -> String? {
