@@ -4,6 +4,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [semver]
 
 ## Unreleased
 
+- Accessibility: icon-only buttons have labels, status text keeps its contrast (only the symbol is coloured), "Off" is written in the sidebar instead of shown by colour alone, sliders show their value, Reduce Motion is respected.
+- Menu bar: Check for Updates, an Icons menu (Regenerate, Clear, Show Journal with shortcuts) and a Help menu.
+- The `stler follow` helper is called "background helper" in the window; long explanations moved into info popovers; shorter welcome sheet; US spelling "color".
+- Changed settings apply on their own (a second after the last change). A newer change of the same type cancels the older job and starts over; adding a folder starts rendering it at once. The Apply button and the floating panel are gone; **Regenerate** forces every icon to be drawn again, **Clear** still asks first.
+
 ## 0.1.0-beta.1
 
 First public beta. See `docs/releases/v0.1.0-beta.1.md` for the full notes.

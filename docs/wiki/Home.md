@@ -12,6 +12,6 @@ Download: [Releases](https://github.com/cagliostro1991/STLer/releases). Source a
 ## The basics in one minute
 
 1. macOS has its own thumbnail for STL and an app cannot replace it, so STLer renders each model off-screen and sets the picture as the file's **custom icon**.
-2. The **window** (`STLer.app`) sets how icons look per file type and applies them to the files that exist now (Apply), or removes them (Clear).
+2. The **window** (`STLer.app`) sets how icons look per file type and applies them to the files that exist now on its own, or removes them (Clear).
 3. The **command line tool** (`stler`) does the same from Terminal, and `stler follow` keeps watching in the background so new files get their icons too.
 4. The file's contents and modification date stay the same. Clear removes only icons STLer made.

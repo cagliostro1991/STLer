@@ -10,10 +10,10 @@ macOS has a built-in provider for STL and does not let an app override it (teste
 No. The only network request is the optional update check, which asks GitHub for the list of STLer releases once a day at most. You can switch it off in General > About.
 
 **Does it work on external drives and network shares?**
-Yes for Apply and for the open Finder folder. On FAT and exFAT drives macOS keeps the icon in a hidden `._name` file next to the model. "When I open a file" only sees places that Spotlight indexes.
+Yes for the window and for the open Finder folder. On FAT and exFAT drives macOS keeps the icon in a hidden `._name` file next to the model. "When I open a file" only sees places that Spotlight indexes.
 
 **What is `stler follow` and do I need it?**
-A small background helper that gives new and changed files their icons by itself. Without it, icons appear when you press Apply. See [Getting started](Getting-Started).
+A small background helper that gives new and changed files their icons by itself. Without it, icons appear only for the folders in the window's scope. See [Getting started](Getting-Started).
 
 **Which file types are supported? Can you add mine?**
 STL, 3MF and STEP/STP. The traffic-light list of next candidates is in the [README](https://github.com/cagliostro1991/STLer#formats). Ask for another one with the [format request form](https://github.com/cagliostro1991/STLer/issues/new?template=format_request.yml).

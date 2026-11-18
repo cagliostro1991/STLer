@@ -12,14 +12,14 @@
 
 ## First icons
 
-1. Open **General** and choose where Apply works: a folder (or several) or your home folder.
+1. Open **General** and choose where icons are set: a folder (or several) or your home folder.
 2. Pick a file type in the sidebar (STL, 3MF, STEP). The preview on the page is a Benchy rendered with your settings.
-3. Change view, projection, colour, the format label. When something is not applied yet, a panel with **Apply** floats at the bottom.
-4. Press **Apply**. The journal (icon at the bottom right) shows progress, you can keep working, and you can cancel.
+3. Change view, projection, colour, the format label. There is no Apply button: icons are drawn a second after your last change, and a newer change cancels the older job.
+4. The journal (icon at the bottom right) shows progress, you can keep working, and you can cancel. **Regenerate** draws every icon again, **Clear** removes them.
 
 ## Keep icons up to date by themselves
 
-Apply covers the files that exist now. For files that arrive later, install `stler follow`:
+The window covers the files that exist now. For files that arrive later, install `stler follow`:
 
 1. General > Follow Finder > **Install in Terminal**.
 2. macOS asks once for permission to control Finder. `follow` only reads which folder is open.
