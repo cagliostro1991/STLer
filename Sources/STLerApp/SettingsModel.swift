@@ -68,10 +68,10 @@ final class SettingsModel: ObservableObject {
     private let jobQueue = JobQueue()
     /// Waiting period after the last change of a type before its icons are rendered, so a slider drag is one job.
     private static let applyDelay: TimeInterval = 1
-    private var applyTimers: [FileType: DispatchWorkItem] = [:]
-    /// Bumped whenever the running or counting Apply of a type is superseded, so a stale count is dropped.
-    private var applyTokens: [FileType: Int] = [:]
     private var applyJobs: [FileType: UUID] = [:]
+    private lazy var scheduler = ApplyScheduler(
+        supersede: { [weak self] type in self?.cancelJob(of: type) },
+        start: { [weak self] type, force in self?.startApply(type, force: force) })
     private var previewToken = 0
 
     init() {
@@ -349,8 +349,7 @@ final class SettingsModel: ObservableObject {
     func confirmPending() {
         guard let pending else { return }
         self.pending = nil
-        applyTimers[pending.type]?.cancel()
-        cancelApply(pending.type)
+        scheduler.cancel(pending.type)
         let files = pending.files
         showJournal = true
         jobQueue.enqueue("Clear \(pending.type.title) icons (\(files.count) files)") { reporter in
@@ -361,15 +360,9 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    /// Settings apply on their own: a type whose settings changed is rendered again, and every enabled type is
-    /// when folders were added or the scope switched. Removing a folder starts nothing.
+    /// Settings apply on their own: see `Config.typesToApply(after:)`.
     private func scheduleApply(after old: Config) {
-        let scopeGrew =
-            config.scope != old.scope || !Set(config.scopeFolders).isSubset(of: old.scopeFolders)
-        for type in FileType.allCases
-        where config[type].enabled && (scopeGrew || config[type] != old[type]) {
-            scheduleApply(type)
-        }
+        for type in config.typesToApply(after: old) { scheduleApply(type) }
     }
 
     /// Renders `type` over the scope after a short quiet period. A newer change cancels the older Apply of the type,
@@ -378,26 +371,23 @@ final class SettingsModel: ObservableObject {
     func scheduleApply(
         _ type: FileType, delay: TimeInterval = SettingsModel.applyDelay, force: Bool = false
     ) {
-        applyTimers[type]?.cancel()
-        cancelApply(type)
-        let timer = DispatchWorkItem { [weak self] in self?.startApply(type, force: force) }
-        applyTimers[type] = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: timer)
+        scheduler.schedule(type, after: delay, force: force)
     }
 
-    private func cancelApply(_ type: FileType) {
-        applyTokens[type, default: 0] += 1
+    private func cancelJob(of type: FileType) {
         if let id = applyJobs.removeValue(forKey: type) { jobQueue.cancel(id) }
     }
 
     private func startApply(_ type: FileType, force: Bool) {
         let config = config, paths = config.scopePaths
         guard config[type].enabled, type != .step || stepReady, !paths.isEmpty else { return }
-        let token = applyTokens[type, default: 0]
+        let token = scheduler.generation(of: type)
         DispatchQueue.global(qos: .utility).async {
             let files = Self.modelFiles(type, in: paths)
             DispatchQueue.main.async {
-                guard self.applyTokens[type, default: 0] == token, !files.isEmpty else { return }
+                guard self.scheduler.isCurrent(type, generation: token), !files.isEmpty else {
+                    return
+                }
                 self.applyJobs[type] = self.jobQueue.enqueue(
                     "\(force ? "Regenerate" : "Apply") \(type.title) (\(files.count) files)"
                 ) { reporter in

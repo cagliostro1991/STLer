@@ -1097,6 +1097,84 @@ if let ortho = try renderPicture(
     }
 }
 
+// MARK: apply planning and scheduling
+
+do {
+    var old = Config()
+    old.step.enabled = false
+    old.scopeFolders = ["~/A"]
+    var changed = old
+    changed.stl.view = .top
+    check(
+        changed.typesToApply(after: old) == [.stl],
+        "only the type whose settings changed is applied again")
+    changed = old
+    changed.step.enabled = true
+    check(changed.typesToApply(after: old) == [.step], "switching a type on applies it")
+    changed = old
+    changed.stl.enabled = false
+    check(changed.typesToApply(after: old).isEmpty, "switching a type off applies nothing")
+    changed = old
+    changed.scopeFolders.append("~/B")
+    check(
+        changed.typesToApply(after: old) == [.stl, .threeMF],
+        "an added folder applies every enabled type")
+    changed = old
+    changed.scopeFolders = []
+    check(changed.typesToApply(after: old).isEmpty, "a removed folder applies nothing")
+    changed = old
+    changed.scope = .home
+    check(
+        changed.typesToApply(after: old) == [.stl, .threeMF],
+        "switching the scope applies every enabled type")
+    changed = old
+    changed.followDepth = 5
+    check(
+        changed.typesToApply(after: old).isEmpty,
+        "a setting that is not about icons applies nothing")
+}
+
+do {
+    let lock = NSLock()
+    var started: [(FileType, Bool)] = []
+    var superseded: [FileType] = []
+    let scheduler = ApplyScheduler(
+        queue: DispatchQueue(label: "selfcheck.scheduler"),
+        supersede: { type in
+            lock.lock(); superseded.append(type); lock.unlock()
+        },
+        start: { type, force in
+            lock.lock(); started.append((type, force)); lock.unlock()
+        })
+
+    scheduler.schedule(.stl, after: 0.1)
+    scheduler.schedule(.stl, after: 0.1)
+    scheduler.schedule(.stl, after: 0.1, force: true)
+    scheduler.schedule(.step, after: 0.1)
+    Thread.sleep(forTimeInterval: 0.5)
+    lock.lock()
+    check(started.filter { $0.0 == .stl }.count == 1, "quick changes of one type start one Apply")
+    check(
+        started.contains { $0.0 == .stl && $0.1 },
+        "the last schedule of a type wins (Regenerate flag kept)")
+    check(started.contains { $0.0 == .step }, "another type is scheduled independently")
+    check(
+        superseded.filter { $0 == .stl }.count == 3,
+        "every newer schedule supersedes the older run of its type")
+    lock.unlock()
+
+    scheduler.schedule(.threeMF, after: 0.1)
+    let before = scheduler.generation(of: .threeMF)
+    scheduler.cancel(.threeMF)
+    check(
+        !scheduler.isCurrent(.threeMF, generation: before),
+        "a cancel makes the run that started before it stale")
+    Thread.sleep(forTimeInterval: 0.4)
+    lock.lock()
+    check(!started.contains { $0.0 == .threeMF }, "a cancelled Apply never starts")
+    lock.unlock()
+}
+
 try? fm.removeItem(at: tmp)
 print(failures == 0 ? "all checks passed" : "\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)
