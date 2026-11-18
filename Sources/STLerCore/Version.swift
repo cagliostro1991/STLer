@@ -2,7 +2,7 @@ import Foundation
 
 /// The app's own version. `VERSION` in the repository root has to say the same; a self-check compares them.
 enum AppVersion {
-    static let current = "0.1.0-beta.1"
+    static let current = "0.1.0-beta.2"
 }
 
 /// A semantic version with an optional prerelease part: `1.2.3`, `0.1.0-beta.2`. A leading `v` is accepted.

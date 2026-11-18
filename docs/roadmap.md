@@ -1,15 +1,14 @@
 # Roadmap
 
-Last updated 2026-11-17.
+Last updated 2026-11-18.
 
 ## Needs the user
-- Run `stler install`, confirm the Finder Automation prompt, check `~/Library/Logs/stler.log` (agent code is untested).
-- Open the new settings window (sidebar layout, per-type pages, scope and confirmations) and check it feels right; I cannot see it.
-- Re-render icons made before signature `v5` (iso camera roll bug, on-axis light, global settings): press Apply on a type page, or `stler --force <folder>`.
+- Check that the icons look right in your own Finder folders after an update, and report what does not (the format request and bug forms are linked from the app, About).
 
 ## Next
-- Screenshots of the settings window for the README (needs a screenshot from the user), then make the repo public (the user's call).
-- LaunchAgent: `install` should migrate or warn about an agent installed under an older name.
+- OBJ and PLY icons (built on a branch, off by default, drawn Z up like STL), then an up-axis option per type for Y-up files.
+- IGES/IGS with the same engines as STEP.
+- Test the request/confirm flow of the settings window (ADR 0014 is still open for it).
 
 ## Maybe
 - Notarised app build (needs a paid Apple Developer account).
