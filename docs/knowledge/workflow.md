@@ -27,13 +27,7 @@ git log --format='%ae' | sort -u     # must print only the no-reply address
 ```
 
 ## Release / publish
-**Version:** bump it in two places that a self-check keeps equal: `VERSION` and `AppVersion.current` in `Sources/STLerCore/Version.swift`. Then `CHANGELOG.md`, the notes in `docs/releases/`, a `vX.Y.Z[-beta.N]` tag, and `Scripts/release.sh`. The in-app update check reads GitHub releases, so a version that is not released there is never offered.
-A full recipe with a notes template is in `docs/release-template.md`; `Scripts/release.sh` builds the archive.
-
-1. `make test && make build` on a clean checkout.
-2. README matches the code (config table, usage, limitations); roadmap updated.
-3. The user approves the commit message (draft first), then commits; never push or change repo visibility without being asked.
-4. Before going public: screenshots, `LICENSE` year/name, no personal paths (`git grep -n "/Users/"`).
+The steps, the approvals and the formats are in [process.md](../process.md#release). Two facts that are easy to forget: the version lives in two places that a self-check keeps equal (`VERSION` and `AppVersion.current` in `Sources/STLerCore/Version.swift`), and the in-app update check reads GitHub releases, so a version that is not released there is never offered. `Scripts/release.sh` builds the archive. Before going public with anything new: screenshots, no personal paths (`git grep -n "/Users/"`).
 
 ## Planning
 Working plans go to `plans/<slug>.md` (git-ignored) with the review pass: scope, risks, tradeoffs, decomposition, open questions. Durable outcomes move to `docs/` (ADR, knowledge, roadmap) and the plan is deleted.

@@ -37,9 +37,4 @@ Names of everyone with a commit in this range.
 ---
 
 ## Release steps
-1. `make test` is green, `VERSION` and `AppVersion.current` in `Sources/STLerCore/Version.swift` are the new version.
-2. Move the entries of `CHANGELOG.md` "Unreleased" under the new version.
-3. `Scripts/release.sh`, check the archive opens on a clean account if you can.
-4. Commit (message approved first), tag `vX.Y.Z[-beta.N]`.
-5. Push the commit and the tag, create the GitHub release from the notes file. Mark betas as pre-release (`gh release create TAG --prerelease --notes-file FILE dist/*.zip dist/*.sha256`).
-6. The update check in the app reads these releases, so a beta shows up for beta users only after step 5.
+See [process.md](process.md#release): version bump PR, notes from this template, `Scripts/release.sh`, tag, pre-release on GitHub, check that the previous version sees the update.
