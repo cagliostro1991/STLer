@@ -372,8 +372,8 @@ struct SettingsView: View {
                         StatusLabel(text: "Not installed", symbol: "exclamationmark.triangle.fill", tint: .orange)
                     }
                 }
-                HStack {
-                    if !model.stepReady {
+                if !model.stepReady {
+                    HStack {
                         Button("Install (45 MB download)") { model.installOpenCascade() }
                         Button("Check again") { model.checkOpenCascade() }
                     }
