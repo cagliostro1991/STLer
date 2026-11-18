@@ -50,11 +50,12 @@
   a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
   .skip { position: absolute; left: 12px; top: -48px; background: var(--bg); color: var(--fg); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); z-index: 10; }
   .skip:focus { top: 12px; }
+  h1, h2, .tagline { text-wrap: balance; }
   .brand { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 12px 0 0; }
   @media (prefers-reduced-motion: reduce) { .btn { transition: none; } .btn:hover, .btn:active { transform: none; } }
   .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
   .note { color: var(--muted); font-size: 14px; margin-top: 12px; }
-  img.shot { display: block; width: 100%; max-width: 760px; margin: 40px auto 0; border-radius: 14px; border: 1px solid var(--line); }
+  img.shot { display: block; width: 100%; height: auto; max-width: 760px; margin: 40px auto 0; }
   section { padding: 44px 0 0; }
   h2 { font-size: 28px; margin: 0 0 12px; letter-spacing: -0.01em; }
   .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-top: 18px; }
@@ -66,17 +67,22 @@
   code { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; }
   pre { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font: 14.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   .muted { color: var(--muted); }
-  table.formats { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 15.5px; }
-  table.formats th, table.formats td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  table.formats th { color: var(--muted); font-weight: 600; font-size: 14px; }
   .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
   .dot.green { background: #34c759; } .dot.yellow { background: #ffcc00; } .dot.red { background: #ff453a; }
-  .legend { color: var(--muted); font-size: 14.5px; margin-top: 10px; }
-  .gallery { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); margin-top: 20px; }
+  .lights { display: grid; gap: 14px; margin-top: 18px; }
+  .light { display: grid; grid-template-columns: 190px 1fr; gap: 10px 28px; background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--tone); border-radius: 12px; padding: 16px 20px; }
+  .light.green { --tone: #34c759; } .light.yellow { --tone: #ffcc00; } .light.red { --tone: #ff453a; }
+  .light h3 { margin: 0; font-size: 18px; }
+  .light h3 small { display: block; margin-top: 4px; color: var(--muted); font-weight: 400; font-size: 14.5px; }
+  .light dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 28px; margin: 0; }
+  .light dt { font-weight: 600; }
+  .light dd { margin: 2px 0 0; color: var(--muted); font-size: 15.5px; }
+  @media (max-width: 760px) { .light { grid-template-columns: 1fr; } .light dl { grid-template-columns: 1fr; } }
+  .gallery { display: grid; gap: 20px; grid-template-columns: repeat(3, 1fr); margin: 24px calc((100% - min(1160px, 100vw - 40px)) / 2) 0; }
   .gallery img { width: 100%; height: auto; display: block; }
-  .split { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: center; }
+  .split { display: grid; grid-template-columns: 1fr 380px; gap: 36px; align-items: start; }
   .split img { width: 100%; height: auto; display: block; }
-  @media (max-width: 760px) { .gallery { grid-template-columns: 1fr; max-width: 360px; margin-inline: auto; } .split { grid-template-columns: 1fr; } .split img { max-width: 360px; margin-inline: auto; } }
+  @media (max-width: 760px) { .gallery { grid-template-columns: 1fr; max-width: 360px; margin: 24px auto 0; } .split { grid-template-columns: 1fr; } .split img { max-width: 360px; margin-inline: auto; } }
   .close { text-align: center; }
   footer { margin-top: 56px; padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
 </style>
@@ -135,20 +141,37 @@
 
 <section>
   <h2>Formats</h2>
-  <p>STL, 3MF and STEP work today. This is what could come next. The colour tells how likely it is.</p>
-  <table class="formats">
-    <tr><th>Format</th><th>Status</th><th>Notes</th></tr>
-    <tr><td>STL, 3MF, STEP / STP</td><td><span class="dot green"></span>Done</td><td></td></tr>
-    <tr><td>OBJ, PLY</td><td><span class="dot green"></span>Planned</td><td>Read by macOS itself, same path as STL.</td></tr>
-    <tr><td>IGES / IGS</td><td><span class="dot green"></span>Planned</td><td>Same engines as STEP, another reader.</td></tr>
-    <tr><td>AMF</td><td><span class="dot yellow"></span>Maybe</td><td>Open XML like 3MF, needs its own loader, little used.</td></tr>
-    <tr><td>F3D (Fusion)</td><td><span class="dot yellow"></span>Maybe</td><td>Only the preview picture stored inside the file can be read, so the icon would be Fusion's, not ours.</td></tr>
-    <tr><td>USDZ, ABC</td><td><span class="dot yellow"></span>Maybe</td><td>Readable by macOS, rarely needed for printing.</td></tr>
-    <tr><td>glTF, GLB, DAE</td><td><span class="dot yellow"></span>Maybe</td><td>Open formats, but macOS cannot read them, a parser would be needed.</td></tr>
-    <tr><td>FBX</td><td><span class="dot red"></span>Unlikely</td><td>Autodesk format, the official SDK has a restrictive licence.</td></tr>
-    <tr><td>SLDPRT, IPT, CATPART</td><td><span class="dot red"></span>Unlikely</td><td>Closed CAD formats, unreadable without the vendors' software.</td></tr>
-  </table>
-  <p class="legend"><span class="dot green"></span>done or planned &nbsp; <span class="dot yellow"></span>maybe &nbsp; <span class="dot red"></span>unlikely: closed format or licence. Want one of them? Open an issue on GitHub.</p>
+  <p>STL, 3MF and STEP work today. The color shows how likely each next format is.</p>
+  <div class="lights">
+    <div class="light green">
+      <h3><span class="dot green"></span>Done</h3>
+      <dl><dt>STL, 3MF, STEP / STP</dt><dd>Icons, plates, colors and assemblies.</dd></dl>
+    </div>
+    <div class="light green">
+      <h3><span class="dot green"></span>Planned</h3>
+      <dl>
+        <dt>OBJ, PLY</dt><dd>Read by macOS itself, same path as STL.</dd>
+        <dt>IGES / IGS</dt><dd>Same engines as STEP, another reader.</dd>
+      </dl>
+    </div>
+    <div class="light yellow">
+      <h3><span class="dot yellow"></span>Maybe</h3>
+      <dl>
+        <dt>AMF</dt><dd>Open XML like 3MF, needs its own loader, little used.</dd>
+        <dt>F3D (Fusion)</dt><dd>Only the preview picture stored inside the file can be read, so the icon would be Fusion's, not ours.</dd>
+        <dt>USDZ, ABC</dt><dd>Readable by macOS, rarely needed for printing.</dd>
+        <dt>glTF, GLB, DAE</dt><dd>Open formats, but macOS cannot read them, a parser would be needed.</dd>
+      </dl>
+    </div>
+    <div class="light red">
+      <h3><span class="dot red"></span>Unlikely<small>closed format or licence</small></h3>
+      <dl>
+        <dt>FBX</dt><dd>Autodesk format, the official SDK has a restrictive licence.</dd>
+        <dt>SLDPRT, IPT, CATPART</dt><dd>Closed CAD formats, unreadable without the vendors' software.</dd>
+      </dl>
+    </div>
+  </div>
+  <p class="muted">Want one of them sooner? <a href="https://github.com/cagliostro1991/STLer/issues/new?template=format_request.yml">Request a format on GitHub</a>.</p>
 </section>
 
 <section>
