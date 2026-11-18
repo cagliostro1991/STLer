@@ -20,7 +20,8 @@ enum ActivityLog {
     /// `STLER_LOG` overrides the path (tests).
     static var url: URL {
         ProcessInfo.processInfo.environment["STLER_LOG"].map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/STLer/activity.json")
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
+                "Library/Logs/STLer/activity.json")
     }
 
     /// Adds the entry, or replaces the one with the same id.
@@ -28,16 +29,24 @@ enum ActivityLog {
         modify { entries in
             var entry = entry
             entry.time = Date().timeIntervalSince1970
-            if let index = entries.firstIndex(where: { $0.id == entry.id }) { entries[index] = entry } else { entries.append(entry) }
+            if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+                entries[index] = entry
+            } else {
+                entries.append(entry)
+            }
             let finished = entries.indices.filter { !entries[$0].running }
-            for index in finished.dropLast(JobQueue.keepFinished).reversed() { entries.remove(at: index) }
+            for index in finished.dropLast(JobQueue.keepFinished).reversed() {
+                entries.remove(at: index)
+            }
         }
     }
 
     /// Asks the process that runs the entry (`stler follow`) to stop; it checks `isCancelRequested` between files.
     static func requestCancel(_ id: UUID) {
         modify { entries in
-            if let index = entries.firstIndex(where: { $0.id == id }) { entries[index].cancelRequested = true }
+            if let index = entries.firstIndex(where: { $0.id == id }) {
+                entries[index].cancelRequested = true
+            }
         }
     }
 
@@ -70,14 +79,16 @@ enum ActivityLog {
     @discardableResult
     private static func modify(_ edit: (inout [Entry]) -> Void) -> [Entry] {
         let fileManager = FileManager.default
-        try? fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let descriptor = open(url.path, O_RDWR | O_CREAT, 0o644)
         guard descriptor >= 0 else { return [] }
         defer { close(descriptor) }
         flock(descriptor, LOCK_EX)
         defer { flock(descriptor, LOCK_UN) }
         let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
-        var entries = (try? JSONDecoder().decode([Entry].self, from: handle.readDataToEndOfFile())) ?? []
+        var entries =
+            (try? JSONDecoder().decode([Entry].self, from: handle.readDataToEndOfFile())) ?? []
         let before = entries
         edit(&entries)
         if entries != before, let data = try? JSONEncoder().encode(entries) {

@@ -11,7 +11,8 @@ enum Feedback {
         parts.queryItems = [
             URLQueryItem(name: "template", value: template),
             URLQueryItem(name: "version", value: AppVersion.current),
-            URLQueryItem(name: "macos", value: ProcessInfo.processInfo.operatingSystemVersionString),
+            URLQueryItem(
+                name: "macos", value: ProcessInfo.processInfo.operatingSystemVersionString),
         ]
         return parts.url!
     }

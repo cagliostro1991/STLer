@@ -18,15 +18,23 @@ enum FollowAgent {
 
     /// The CLI to install from: the `stler` built next to the app, otherwise the copy already in `~/.local/bin`.
     static func cliURL(appBundle: URL) -> URL? {
-        [appBundle.deletingLastPathComponent().appendingPathComponent("stler"), binaryURL].first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        [appBundle.deletingLastPathComponent().appendingPathComponent("stler"), binaryURL].first {
+            FileManager.default.isExecutableFile(atPath: $0.path)
+        }
     }
 
     /// Opens Terminal and runs `stler install` (which copies the CLI to `~/.local/bin` and loads the agent).
     /// - Returns: What the user should do next.
     static func installInTerminal(appBundle: URL) -> String {
-        guard let cli = cliURL(appBundle: appBundle) else { return "The stler command line tool was not found next to the app. Run `make build` first." }
+        guard let cli = cliURL(appBundle: appBundle) else {
+            return
+                "The stler command line tool was not found next to the app. Run `make build` first."
+        }
         let quoted = "'" + cli.path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        guard TerminalScript.run("\(quoted) install\necho\necho 'Finished. Go back to STLer and press Check again.'", name: "stler-install-follow")
+        guard
+            TerminalScript.run(
+                "\(quoted) install\necho\necho 'Finished. Go back to STLer and press Check again.'",
+                name: "stler-install-follow")
         else { return "Could not prepare the install script. Run: stler install" }
         return "Installing in Terminal. The first run asks for permission to control Finder."
     }
@@ -70,9 +78,13 @@ enum FollowAgent {
         process.standardError = FileHandle.nullDevice
         var output = ""
         if (try? process.run()) != nil {
-            output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            output = String(
+                decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             process.waitUntilExit()
         }
-        return state(plistExists: fileManager.fileExists(atPath: plistURL.path), binaryExists: fileManager.isExecutableFile(atPath: binaryURL.path), launchctlOutput: output)
+        return state(
+            plistExists: fileManager.fileExists(atPath: plistURL.path),
+            binaryExists: fileManager.isExecutableFile(atPath: binaryURL.path),
+            launchctlOutput: output)
     }
 }

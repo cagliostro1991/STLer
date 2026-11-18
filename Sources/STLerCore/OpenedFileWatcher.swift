@@ -15,12 +15,17 @@ final class OpenedFileWatcher {
     func start(extensions: [String], onOpened: @escaping ([String]) -> Void) {
         guard !query.isStarted else { return }
         let names = extensions.map { "kMDItemFSName LIKE[c] '*.\($0)'" }.joined(separator: " OR ")
-        query.predicate = NSPredicate(format: "kMDItemLastUsedDate > %@ AND (\(names))", Date() as NSDate)
+        query.predicate = NSPredicate(
+            format: "kMDItemLastUsedDate > %@ AND (\(names))", Date() as NSDate)
         query.searchScopes = [NSMetadataQueryIndexedLocalComputerScope]
-        observer = NotificationCenter.default.addObserver(forName: .NSMetadataQueryDidUpdate, object: query, queue: .main) { note in
+        observer = NotificationCenter.default.addObserver(
+            forName: .NSMetadataQueryDidUpdate, object: query, queue: .main
+        ) { note in
             let keys = [NSMetadataQueryUpdateAddedItemsKey, NSMetadataQueryUpdateChangedItemsKey]
             let items = keys.flatMap { note.userInfo?[$0] as? [NSMetadataItem] ?? [] }
-            let paths = items.compactMap { $0.value(forAttribute: NSMetadataItemPathKey) as? String }
+            let paths = items.compactMap {
+                $0.value(forAttribute: NSMetadataItemPathKey) as? String
+            }
             if !paths.isEmpty { onOpened(Array(Set(paths))) }
         }
         query.start()
@@ -35,7 +40,9 @@ final class OpenedFileWatcher {
     /// Keeps the opened files worth an icon: ordinary user files of an enabled type that still exist.
     static func relevant(_ paths: [String], config: Config) -> [String] {
         paths.filter { path in
-            guard let type = FileType(path: path), config[type].enabled, FileScanner.isUserFile(path) else { return false }
+            guard let type = FileType(path: path), config[type].enabled,
+                FileScanner.isUserFile(path)
+            else { return false }
             return FileManager.default.fileExists(atPath: path)
         }
     }

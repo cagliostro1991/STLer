@@ -9,12 +9,15 @@ enum TerminalScript {
     /// - Returns: False when the script could not be written.
     @discardableResult
     static func run(_ commands: String, name: String) -> Bool {
-        let script = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).command")
+        let script = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "\(name).command")
         let body = "#!/bin/zsh\n\(commands)\n"
         guard (try? body.write(to: script, atomically: true, encoding: .utf8)) != nil,
-              (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)) != nil
+            (try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o755], ofItemAtPath: script.path)) != nil
         else { return false }
-        Process.launchedProcess(launchPath: "/usr/bin/open", arguments: ["-a", "Terminal", script.path])
+        Process.launchedProcess(
+            launchPath: "/usr/bin/open", arguments: ["-a", "Terminal", script.path])
         return true
     }
 }

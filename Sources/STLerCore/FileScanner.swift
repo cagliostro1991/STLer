@@ -11,17 +11,27 @@ enum FileScanner {
         for raw in paths {
             let path = (raw as NSString).expandingTildeInPath
             var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else { continue }
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else {
+                continue
+            }
             guard isDirectory.boolValue else {
-                if allowed.contains((path as NSString).pathExtension.lowercased()) { files.append(path) }
+                if allowed.contains((path as NSString).pathExtension.lowercased()) {
+                    files.append(path)
+                }
                 continue
             }
             let root = URL(fileURLWithPath: path)
             let rootDepth = maxDepth == nil ? 0 : root.standardizedFileURL.pathComponents.count
-            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles, .skipsPackageDescendants])
+            let walker = FileManager.default.enumerator(
+                at: root, includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants])
             while let url = walker?.nextObject() as? URL {
-                if let maxDepth, url.standardizedFileURL.pathComponents.count - rootDepth >= maxDepth,
-                   (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { walker?.skipDescendants() }
+                if let maxDepth,
+                    url.standardizedFileURL.pathComponents.count - rootDepth >= maxDepth,
+                    (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+                {
+                    walker?.skipDescendants()
+                }
                 if allowed.contains(url.pathExtension.lowercased()) { files.append(url.path) }
             }
         }
@@ -33,15 +43,20 @@ enum FileScanner {
     static func ordered(_ files: [String], under folder: String) -> [String] {
         let base = (folder as NSString).standardizingPath.count
         func depth(_ file: String) -> Int { file.dropFirst(base).split(separator: "/").count }
-        func size(_ file: String) -> Int { (try? FileManager.default.attributesOfItem(atPath: file)[.size] as? Int) ?? 0 }
+        func size(_ file: String) -> Int {
+            (try? FileManager.default.attributesOfItem(atPath: file)[.size] as? Int) ?? 0
+        }
         let keys = files.map { (depth: depth($0), size: size($0)) }
-        return files.indices.sorted { (keys[$0].depth, keys[$0].size, $0) < (keys[$1].depth, keys[$1].size, $1) }.map { files[$0] }
+        return files.indices.sorted {
+            (keys[$0].depth, keys[$0].size, $0) < (keys[$1].depth, keys[$1].size, $1)
+        }.map { files[$0] }
     }
 
     /// `collect` per path, each ordered top level first, duplicates across paths removed.
     static func scan(_ paths: [String], formats: [String], maxDepth: Int? = nil) -> [String] {
         var seen = Set<String>()
-        return paths
+        return
+            paths
             .flatMap { ordered(collect([$0], formats: formats, maxDepth: maxDepth), under: $0) }
             .filter { seen.insert($0).inserted }
     }
@@ -49,7 +64,8 @@ enum FileScanner {
     /// Model files of one type under `folder` from the Spotlight index: instant even on a huge folder, but files the index
     /// has not seen are missed, so treat it as an estimate. Library folders, hidden folders and app packages are left out.
     static func spotlight(_ type: FileType, in folder: String) -> [String] {
-        let query = type.extensions.map { "kMDItemFSName == \"*.\($0)\"c" }.joined(separator: " || ")
+        let query = type.extensions.map { "kMDItemFSName == \"*.\($0)\"c" }.joined(
+            separator: " || ")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/mdfind")
         process.arguments = ["-onlyin", folder, query]
@@ -59,7 +75,8 @@ enum FileScanner {
         guard (try? process.run()) != nil else { return [] }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter(isUserFile)
+        return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter(
+            isUserFile)
     }
 
     /// Spotlight-based file counts per type under `folder`.
@@ -84,7 +101,9 @@ enum FileScanner {
         var allowed = Set(formats)
         if allowed.contains("step") { allowed.insert("stp") }
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
-        let models = names.filter { !$0.hasPrefix(".") && allowed.contains(($0 as NSString).pathExtension.lowercased()) }.map { folder + "/" + $0 }
+        let models = names.filter {
+            !$0.hasPrefix(".") && allowed.contains(($0 as NSString).pathExtension.lowercased())
+        }.map { folder + "/" + $0 }
         return Array(ordered(models, under: folder).prefix(siblingLimit))
     }
 
@@ -93,7 +112,8 @@ enum FileScanner {
         let packageSuffixes = [".app", ".bundle", ".framework", ".photoslibrary"]
         let components = path.split(separator: "/")
         return !components.contains { component in
-            component.hasPrefix(".") || component == "Library" || packageSuffixes.contains { component.hasSuffix($0) }
+            component.hasPrefix(".") || component == "Library"
+                || packageSuffixes.contains { component.hasSuffix($0) }
         }
     }
 }

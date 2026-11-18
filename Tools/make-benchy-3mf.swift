@@ -29,8 +29,13 @@ data.withUnsafeBytes { raw in
         var ids: [Int] = []
         var centroid = SIMD3<Float>(repeating: 0)
         for v in 0..<3 {
-            let p = SIMD3<Float>(raw.loadUnaligned(fromByteOffset: base + v * 12, as: Float.self), raw.loadUnaligned(fromByteOffset: base + v * 12 + 4, as: Float.self), raw.loadUnaligned(fromByteOffset: base + v * 12 + 8, as: Float.self))
-            let key = SIMD3<Int32>(Int32((p.x * 1000).rounded()), Int32((p.y * 1000).rounded()), Int32((p.z * 1000).rounded()))
+            let p = SIMD3<Float>(
+                raw.loadUnaligned(fromByteOffset: base + v * 12, as: Float.self),
+                raw.loadUnaligned(fromByteOffset: base + v * 12 + 4, as: Float.self),
+                raw.loadUnaligned(fromByteOffset: base + v * 12 + 8, as: Float.self))
+            let key = SIMD3<Int32>(
+                Int32((p.x * 1000).rounded()), Int32((p.y * 1000).rounded()),
+                Int32((p.z * 1000).rounded()))
             if index[key] == nil { index[key] = vertices.count; vertices.append(p) }
             ids.append(index[key]!)
             centroid += p / 3
@@ -40,17 +45,24 @@ data.withUnsafeBytes { raw in
 }
 
 var xml = """
-<?xml version="1.0" encoding="UTF-8"?>
-<model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>
+    <?xml version="1.0" encoding="UTF-8"?>
+    <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>
 
-"""
+    """
 for (axis, palette) in palettes.enumerated() {
-    xml += "<basematerials id=\"\(axis + 1)\">\(palette.map { "<base name=\"c\" displaycolor=\"\($0)\"/>" }.joined())</basematerials>\n"
+    xml +=
+        "<basematerials id=\"\(axis + 1)\">\(palette.map { "<base name=\"c\" displaycolor=\"\($0)\"/>" }.joined())</basematerials>\n"
 }
-let vertexXML = "<vertices>" + vertices.map { "<vertex x=\"\($0.x)\" y=\"\($0.y)\" z=\"\($0.z)\"/>" }.joined() + "</vertices>"
+let vertexXML =
+    "<vertices>" + vertices.map { "<vertex x=\"\($0.x)\" y=\"\($0.y)\" z=\"\($0.z)\"/>" }.joined()
+    + "</vertices>"
 for axis in 0..<palettes.count {
-    xml += "<object id=\"\(axis + 1)\" type=\"model\" pid=\"\(axis + 1)\" pindex=\"0\"><mesh>\(vertexXML)<triangles>"
-    for t in corners { xml += "<triangle v1=\"\(t.0)\" v2=\"\(t.1)\" v3=\"\(t.2)\" pid=\"\(axis + 1)\" p1=\"\(band(axis, t.3))\"/>" }
+    xml +=
+        "<object id=\"\(axis + 1)\" type=\"model\" pid=\"\(axis + 1)\" pindex=\"0\"><mesh>\(vertexXML)<triangles>"
+    for t in corners {
+        xml +=
+            "<triangle v1=\"\(t.0)\" v2=\"\(t.1)\" v3=\"\(t.2)\" pid=\"\(axis + 1)\" p1=\"\(band(axis, t.3))\"/>"
+    }
     xml += "</triangles></mesh></object>\n"
 }
 // Plate k holds k boats, all painted like object k, in a row of its own.
@@ -63,24 +75,29 @@ for plate in 1...3 {
 }
 xml += "</resources><build>" + items.joined() + "</build></model>"
 
-let work = FileManager.default.temporaryDirectory.appendingPathComponent("benchy-3mf-\(UUID().uuidString)")
+let work = FileManager.default.temporaryDirectory.appendingPathComponent(
+    "benchy-3mf-\(UUID().uuidString)")
 func write(_ text: String, _ path: String) throws {
     let url = work.appendingPathComponent(path)
-    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try text.write(to: url, atomically: true, encoding: .utf8)
 }
 try write(xml, "3D/3dmodel.model")
-try write("""
-<?xml version="1.0" encoding="UTF-8"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>
-""", "[Content_Types].xml")
-try write("""
-<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>
-""", "_rels/.rels")
-try write("""
-<config>\((1...3).map { "<plate><metadata key=\"plater_id\" value=\"\($0)\"/><model_instance><metadata key=\"object_id\" value=\"\($0)\"/></model_instance></plate>" }.joined())</config>
-""", "Metadata/model_settings.config")
+try write(
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>
+    """, "[Content_Types].xml")
+try write(
+    """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>
+    """, "_rels/.rels")
+try write(
+    """
+    <config>\((1...3).map { "<plate><metadata key=\"plater_id\" value=\"\($0)\"/><model_instance><metadata key=\"object_id\" value=\"\($0)\"/></model_instance></plate>" }.joined())</config>
+    """, "Metadata/model_settings.config")
 
 let output = resources.appendingPathComponent("3DBenchy.3mf")
 try? FileManager.default.removeItem(at: output)

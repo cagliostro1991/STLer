@@ -10,9 +10,14 @@ enum Signature {
     static func make(for config: Config, type: FileType) -> String {
         let style = config[type]
         let label = style.label
-        var parts = ["v6", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color]
+        var parts = [
+            "v6", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color,
+        ]
         if type != .stl { parts += [String(style.limit), String(style.modelColors)] }
-        parts += [label.corner.rawValue, label.textColor, label.backgroundColor, String(label.cornerRadius), String(label.opacity)]
+        parts += [
+            label.corner.rawValue, label.textColor, label.backgroundColor,
+            String(label.cornerRadius), String(label.opacity),
+        ]
         return parts.joined(separator: "|")
     }
 
@@ -20,7 +25,9 @@ enum Signature {
     /// The signature alone is not proof: attributes survive some copies and moves only in part (other volumes, iCloud, archives).
     static func hasIcon(_ path: String) -> Bool {
         var info = [UInt8](repeating: 0, count: 32)
-        guard getxattr(path, "com.apple.FinderInfo", &info, info.count, 0, 0) == info.count, info[8] & 0x04 != 0 else { return false }
+        guard getxattr(path, "com.apple.FinderInfo", &info, info.count, 0, 0) == info.count,
+            info[8] & 0x04 != 0
+        else { return false }
         return getxattr(path, "com.apple.ResourceFork", nil, 0, 0, 0) > 0
     }
 

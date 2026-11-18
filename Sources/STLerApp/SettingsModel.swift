@@ -20,7 +20,11 @@ final class SettingsModel: ObservableObject {
         didSet {
             guard config != oldValue else { return }
             try? config.save()
-            if config.freecadPath != oldValue.freecadPath || config.stepEngine != oldValue.stepEngine { refreshFreecad() }
+            if config.freecadPath != oldValue.freecadPath
+                || config.stepEngine != oldValue.stepEngine
+            {
+                refreshFreecad()
+            }
             refreshPreview()
             scheduleApply(after: oldValue)
         }
@@ -72,18 +76,33 @@ final class SettingsModel: ObservableObject {
 
     init() {
         for type in FileType.allCases {
-            let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map { URL(fileURLWithPath: $0) }
-            samples[type] = remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+            let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map {
+                URL(fileURLWithPath: $0)
+            }
+            samples[type] =
+                remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 ?? Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
         }
         refreshFreecad()
         refreshPreview()
         jobQueue.didChange = { [weak self] in DispatchQueue.main.async { self?.refreshJournal() } }
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refreshJournal() }
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.refreshJournal()
+        }
         refreshAgent()
-        if config.checkUpdates, Date().timeIntervalSince(UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date ?? .distantPast) > 86_400 { checkForUpdate() }
-        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.refreshAgent() }
-        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.refreshAgent() }
+        if config.checkUpdates,
+            Date().timeIntervalSince(
+                UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date ?? .distantPast)
+                > 86_400
+        {
+            checkForUpdate()
+        }
+        Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            self?.refreshAgent()
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.refreshAgent() }
     }
 
     /// Asks GitHub for the newest release. Called at launch (at most once a day, when enabled) and by the button.
@@ -98,7 +117,11 @@ final class SettingsModel: ObservableObject {
 
     /// Cancels a job of this window directly, a job of `stler follow` through the shared log.
     func cancel(_ job: Job) {
-        if jobQueue.jobs.contains(where: { $0.id == job.id }) { jobQueue.cancel(job.id) } else { ActivityLog.requestCancel(job.id) }
+        if jobQueue.jobs.contains(where: { $0.id == job.id }) {
+            jobQueue.cancel(job.id)
+        } else {
+            ActivityLog.requestCancel(job.id)
+        }
         refreshJournal()
     }
 
@@ -124,16 +147,23 @@ final class SettingsModel: ObservableObject {
     }
 
     /// Opens Terminal with `stler install`, see `FollowAgent.installInTerminal`.
-    func installFollow() { status = FollowAgent.installInTerminal(appBundle: Bundle.main.bundleURL) }
+    func installFollow() {
+        status = FollowAgent.installInTerminal(appBundle: Bundle.main.bundleURL)
+    }
 
     /// Stops or starts the installed agent right away, no Terminal needed.
     func toggleFollow() {
         let wasRunning = agent == .running
-        status = wasRunning ? "Stopping the background helper ..." : "Starting the background helper ..."
+        status =
+            wasRunning ? "Stopping the background helper ..." : "Starting the background helper ..."
         DispatchQueue.global(qos: .userInitiated).async {
             let ok = wasRunning ? FollowAgent.stop() : FollowAgent.start()
             DispatchQueue.main.async {
-                self.status = ok ? (wasRunning ? "The background helper stopped. It starts again at login, or press Start." : "The background helper started.") : "launchctl refused. Try Reinstall."
+                self.status =
+                    ok
+                    ? (wasRunning
+                        ? "The background helper stopped. It starts again at login, or press Start."
+                        : "The background helper started.") : "launchctl refused. Try Reinstall."
                 self.refreshAgent()
             }
         }
@@ -147,8 +177,11 @@ final class SettingsModel: ObservableObject {
     /// Merges the window's own jobs with the shared log of `stler follow`: finished ones by time, then running, then queued.
     func refreshJournal() {
         let all = jobQueue.jobs + ActivityLog.jobs()
-        let finished = all.filter { $0.state == .done }.sorted { $0.finishedAt < $1.finishedAt }.suffix(JobQueue.keepFinished)
-        let merged = Array(finished) + all.filter { $0.state == .running } + all.filter { $0.state == .queued }
+        let finished = all.filter { $0.state == .done }.sorted { $0.finishedAt < $1.finishedAt }
+            .suffix(JobQueue.keepFinished)
+        let merged =
+            Array(finished) + all.filter { $0.state == .running }
+            + all.filter { $0.state == .queued }
         if merged != journal { journal = merged }
     }
 
@@ -165,7 +198,13 @@ final class SettingsModel: ObservableObject {
     var sample: URL? { samples[previewType] }
 
     /// Whether the open page shows a file the user picked instead of the bundled sample.
-    var hasCustomSample: Bool { sample.map { $0 != Bundle.main.url(forResource: "3DBenchy", withExtension: previewType.sampleExtension) } ?? false }
+    var hasCustomSample: Bool {
+        sample.map {
+            $0
+                != Bundle.main.url(
+                    forResource: "3DBenchy", withExtension: previewType.sampleExtension)
+        } ?? false
+    }
 
     func chooseSample() {
         let type = previewType
@@ -180,7 +219,8 @@ final class SettingsModel: ObservableObject {
     func resetSample() {
         let type = previewType
         UserDefaults.standard.removeObject(forKey: "sample.\(type.rawValue)")
-        samples[type] = Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
+        samples[type] = Bundle.main.url(
+            forResource: "3DBenchy", withExtension: type.sampleExtension)
         refreshPreview()
     }
 
@@ -212,7 +252,8 @@ final class SettingsModel: ObservableObject {
 
     func checkOpenCascade() {
         refreshFreecad()
-        status = OpenCascade.prefix == nil ? "OpenCASCADE is still not installed." : "OpenCASCADE found."
+        status =
+            OpenCascade.prefix == nil ? "OpenCASCADE is still not installed." : "OpenCASCADE found."
         refreshPreview()
     }
 
@@ -229,7 +270,8 @@ final class SettingsModel: ObservableObject {
                     self.refreshFreecad()
                     self.status = "Found FreeCAD: \(found)"
                 } else if !silent {
-                    self.status = "FreeCAD not found. Install it, or choose freecadcmd (or FreeCAD.app) by hand."
+                    self.status =
+                        "FreeCAD not found. Install it, or choose freecadcmd (or FreeCAD.app) by hand."
                 }
             }
         }
@@ -240,15 +282,23 @@ final class SettingsModel: ObservableObject {
         panel.message = "Choose freecadcmd or FreeCAD.app"
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
         guard panel.runModal() == .OK, var url = panel.url else { return }
-        if url.pathExtension == "app" { url = url.appendingPathComponent("Contents/Resources/bin/freecadcmd") }
-        if let error = config.set("freecadPath", url.path) { status = error } else { refreshFreecad(); status = "FreeCAD set: \(url.path)" }
+        if url.pathExtension == "app" {
+            url = url.appendingPathComponent("Contents/Resources/bin/freecadcmd")
+        }
+        if let error = config.set("freecadPath", url.path) {
+            status = error
+        } else {
+            refreshFreecad(); status = "FreeCAD set: \(url.path)"
+        }
     }
 
     /// Asks for confirmation (with a quick file count) before the scope becomes the home folder.
     /// Counts first and opens the dialog afterwards: a presented dialog keeps the text it was opened with.
     func proposeHomeScope() {
         status = "Counting model files in your home folder ..."
-        estimateHome { self.status = ""; self.confirmingHome = true }
+        estimateHome {
+            self.status = ""; self.confirmingHome = true
+        }
     }
 
     func confirmHomeScope() {
@@ -264,7 +314,9 @@ final class SettingsModel: ObservableObject {
         homeEstimate = nil
         DispatchQueue.global(qos: .userInitiated).async {
             let estimate = FileScanner.estimate(in: NSHomeDirectory())
-            DispatchQueue.main.async { self.homeEstimate = estimate; done() }
+            DispatchQueue.main.async {
+                self.homeEstimate = estimate; done()
+            }
         }
     }
 
@@ -302,16 +354,20 @@ final class SettingsModel: ObservableObject {
         let files = pending.files
         showJournal = true
         jobQueue.enqueue("Clear \(pending.type.title) icons (\(files.count) files)") { reporter in
-            let r = IconBatch.reset(files, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
-            return (r.interrupted ? "Cancelled. " : "") + "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
+            let r = IconBatch.reset(
+                files, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
+            return (r.interrupted ? "Cancelled. " : "")
+                + "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
         }
     }
 
     /// Settings apply on their own: a type whose settings changed is rendered again, and every enabled type is
     /// when folders were added or the scope switched. Removing a folder starts nothing.
     private func scheduleApply(after old: Config) {
-        let scopeGrew = config.scope != old.scope || !Set(config.scopeFolders).isSubset(of: old.scopeFolders)
-        for type in FileType.allCases where config[type].enabled && (scopeGrew || config[type] != old[type]) {
+        let scopeGrew =
+            config.scope != old.scope || !Set(config.scopeFolders).isSubset(of: old.scopeFolders)
+        for type in FileType.allCases
+        where config[type].enabled && (scopeGrew || config[type] != old[type]) {
             scheduleApply(type)
         }
     }
@@ -319,7 +375,9 @@ final class SettingsModel: ObservableObject {
     /// Renders `type` over the scope after a short quiet period. A newer change cancels the older Apply of the type,
     /// waiting or running, and starts over with the new settings.
     /// - Parameter force: Draw every icon again, also where its signature already matches (Regenerate).
-    func scheduleApply(_ type: FileType, delay: TimeInterval = SettingsModel.applyDelay, force: Bool = false) {
+    func scheduleApply(
+        _ type: FileType, delay: TimeInterval = SettingsModel.applyDelay, force: Bool = false
+    ) {
         applyTimers[type]?.cancel()
         cancelApply(type)
         let timer = DispatchWorkItem { [weak self] in self?.startApply(type, force: force) }
@@ -340,9 +398,16 @@ final class SettingsModel: ObservableObject {
             let files = Self.modelFiles(type, in: paths)
             DispatchQueue.main.async {
                 guard self.applyTokens[type, default: 0] == token, !files.isEmpty else { return }
-                self.applyJobs[type] = self.jobQueue.enqueue("\(force ? "Regenerate" : "Apply") \(type.title) (\(files.count) files)") { reporter in
-                    let r = IconBatch.apply(files, config: config, force: force, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
-                    return (r.interrupted ? "Cancelled. " : "") + "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
+                self.applyJobs[type] = self.jobQueue.enqueue(
+                    "\(force ? "Regenerate" : "Apply") \(type.title) (\(files.count) files)"
+                ) { reporter in
+                    let r = IconBatch.apply(
+                        files, config: config, force: force, onProgress: reporter.progress,
+                        shouldContinue: { !reporter.isCancelled() })
+                    return (r.interrupted ? "Cancelled. " : "")
+                        + "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)."
+                        + (r.messages.isEmpty
+                            ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
                 }
             }
         }
@@ -350,7 +415,9 @@ final class SettingsModel: ObservableObject {
 
     private static func modelFiles(_ type: FileType, in paths: [String]) -> [String] {
         var seen = Set<String>()
-        return paths.flatMap { FileScanner.spotlight(type, in: $0) }.filter { seen.insert($0).inserted }
+        return paths.flatMap { FileScanner.spotlight(type, in: $0) }.filter {
+            seen.insert($0).inserted
+        }
     }
 
     private func refreshPreview() {
@@ -358,14 +425,20 @@ final class SettingsModel: ObservableObject {
         let token = previewToken, type = previewType, config = config
         previewBusy = false
         guard let url = sample else { preview = nil; previewNote = "No sample"; return }
-        if type == .step, !StepConverter.isReady(config) { preview = nil; previewNote = "Choose a STEP engine above to see the preview"; return }
+        if type == .step, !StepConverter.isReady(config) {
+            preview = nil; previewNote = "Choose a STEP engine above to see the preview"; return
+        }
         previewNote = nil
         previewBusy = true
         let options = IconRenderer.Options(style: config[type], labelText: type.title)
         queue.async {
             guard token == self.previewToken else { return }
-            let source = type == .step ? StepConverter.convert([url.path], config: config).urls[url.path] : url
-            let image = source.flatMap { IconRenderer.render($0, size: CGSize(width: 384, height: 384), options: options) }
+            let source =
+                type == .step
+                ? StepConverter.convert([url.path], config: config).urls[url.path] : url
+            let image = source.flatMap {
+                IconRenderer.render($0, size: CGSize(width: 384, height: 384), options: options)
+            }
             DispatchQueue.main.async {
                 guard token == self.previewToken else { return }
                 self.preview = image

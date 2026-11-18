@@ -42,7 +42,8 @@ enum IconRenderer {
         scene.rootNode.enumerateHierarchy { node, _ in
             guard let geometry = node.geometry else { return }
             let material = SCNMaterial()
-            material.diffuse.contents = geometry.sources(for: .color).isEmpty ? options.color : NSColor.white
+            material.diffuse.contents =
+                geometry.sources(for: .color).isEmpty ? options.color : NSColor.white
             material.lightingModel = .blinn
             geometry.materials = [material]
         }
@@ -53,7 +54,9 @@ enum IconRenderer {
         let radius = (dx * dx + dy * dy + dz * dz).squareRoot() / 2
 
         let direction = options.view.cameraDirection
-        let length = (direction.x * direction.x + direction.y * direction.y + direction.z * direction.z).squareRoot()
+        let length =
+            (direction.x * direction.x + direction.y * direction.y + direction.z * direction.z)
+            .squareRoot()
         let camera = SCNCamera()
         let distance: CGFloat
         switch options.projection {
@@ -72,7 +75,9 @@ enum IconRenderer {
         let cameraNode = SCNNode()
         cameraNode.camera = camera
         let reach = distance / length
-        cameraNode.position = SCNVector3(center.x + direction.x * reach, center.y + direction.y * reach, center.z + direction.z * reach)
+        cameraNode.position = SCNVector3(
+            center.x + direction.x * reach, center.y + direction.y * reach,
+            center.z + direction.z * reach)
         scene.rootNode.addChildNode(cameraNode)
         cameraNode.look(at: center, up: options.view.cameraUp, localFront: SCNVector3(0, 0, -1))
 
@@ -92,20 +97,29 @@ enum IconRenderer {
         renderer.pointOfView = cameraNode
         let image = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
         guard options.label.corner != .off else { return image }
-        return addLabel(to: image, text: options.labelText ?? url.pathExtension.uppercased(), style: options.label)
+        return addLabel(
+            to: image, text: options.labelText ?? url.pathExtension.uppercased(),
+            style: options.label)
     }
 
     private static func loadScene(_ url: URL, options: Options) -> SCNScene? {
         guard url.pathExtension.lowercased() == "3mf" else {
             let scene = SCNScene(mdlAsset: MDLAsset(url: url))
             scene.rootNode.enumerateHierarchy { node, _ in
-                if let geometry = node.geometry, let corners = FlatGeometry.corners(of: geometry) { node.geometry = FlatGeometry.make(points: corners) }
+                if let geometry = node.geometry, let corners = FlatGeometry.corners(of: geometry) {
+                    node.geometry = FlatGeometry.make(points: corners)
+                }
             }
             return scene
         }
         let fill = (options.color.usingColorSpace(.sRGB) ?? .gray)
-        let rgb = SIMD3(Float(fill.redComponent), Float(fill.greenComponent), Float(fill.blueComponent))
-        guard let node = ThreeMFLoader(url: url, plates: options.plates, fill: rgb, colorAmount: Float(options.modelColors)).load() else { return nil }
+        let rgb = SIMD3(
+            Float(fill.redComponent), Float(fill.greenComponent), Float(fill.blueComponent))
+        guard
+            let node = ThreeMFLoader(
+                url: url, plates: options.plates, fill: rgb, colorAmount: Float(options.modelColors)
+            ).load()
+        else { return nil }
         let scene = SCNScene()
         scene.rootNode.addChildNode(node)
         return scene
@@ -117,7 +131,12 @@ enum IconRenderer {
             image.draw(in: rect)
             let alpha = CGFloat(style.opacity)
             let textColor = (Config.parseColor(style.textColor) ?? .white).withAlphaComponent(alpha)
-            let label = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size.height * 0.11, weight: .bold), .foregroundColor: textColor])
+            let label = NSAttributedString(
+                string: text,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: size.height * 0.11, weight: .bold),
+                    .foregroundColor: textColor,
+                ])
             let textSize = label.size()
             let padX = size.height * 0.035, padY = size.height * 0.02, margin = size.height * 0.03
             let (width, height) = (textSize.width + padX * 2, textSize.height + padY * 2)
@@ -127,7 +146,10 @@ enum IconRenderer {
             let y = isTop ? size.height - height - margin : margin
             let radius = height * CGFloat(style.cornerRadius) / 100
             (Config.parseColor(style.backgroundColor) ?? .black).withAlphaComponent(alpha).setFill()
-            NSBezierPath(roundedRect: CGRect(x: x, y: y, width: width, height: height), xRadius: radius, yRadius: radius).fill()
+            NSBezierPath(
+                roundedRect: CGRect(x: x, y: y, width: width, height: height), xRadius: radius,
+                yRadius: radius
+            ).fill()
             label.draw(at: CGPoint(x: x + padX, y: y + padY))
             return true
         }
