@@ -14,7 +14,8 @@ iconutil -c icns icons/macOS/AppIcon.iconset -o $APP/Contents/Resources/AppIcon.
 cp Sources/STLerApp/Info.plist $APP/Contents/Info.plist
 VERSION=$(cat VERSION)
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $VERSION" $APP/Contents/Info.plist
-cp Sources/STLerApp/Resources/3DBenchy.* $APP/Contents/Resources/
+# -X: STLer may have put its own icons on the samples; their Finder attributes would make codesign refuse the bundle
+cp -X Sources/STLerApp/Resources/3DBenchy.* $APP/Contents/Resources/
 
 codesign -f -s - $APP
 codesign -f -s - build/stler
