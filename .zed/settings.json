@@ -1,0 +1,18 @@
+{
+  "languages": {
+    "Swift": {
+      "tab_size": 4,
+      "hard_tabs": false,
+      "format_on_save": "on",
+      "language_servers": ["sourcekit-lsp"]
+    }
+  },
+  "ensure_final_newline_on_save": true,
+  "remove_trailing_whitespace_on_save": true,
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.DS_Store",
+    "**/build",
+    "**/dist"
+  ]
+}
