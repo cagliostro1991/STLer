@@ -43,3 +43,6 @@ Comparing only the folder path means a file dropped into the open folder is neve
 ## The signature is not proof of an icon
 
 Extended attributes do not always travel together: a copy to another volume, through iCloud or via an archive can keep `dev.stler.sig` and lose the resource fork or the Finder "custom icon" flag. Trusting the signature alone left such files grey for good. `IconBatch` treats a file as up to date only when the signature matches and `Signature.hasIcon` (flag in `com.apple.FinderInfo`, byte 8 bit `0x04`, plus a non-empty `com.apple.ResourceFork`) agrees.
+
+## Icons on the bundled samples break codesign
+STLer sets custom icons (resource fork and Finder info) on any model file in its scope, including the samples in `Sources/STLerApp/Resources`. `cp` copies those attributes into the app bundle and `codesign` then fails with "resource fork, Finder information, or similar detritus not allowed". `Scripts/build.sh` copies with `cp -X` for that reason.
