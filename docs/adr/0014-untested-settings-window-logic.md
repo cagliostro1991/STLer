@@ -13,5 +13,6 @@ Accept this for now. The fix is small and was verified by hand and by timing the
 
 ## Consequences
 
-- Open debt: move the request/confirm flow (scope change, count, pending action) out of `SettingsModel` into `STLerCore` as a plain type with a completion callback, then test the order "count finished, then confirmation offered".
+- Done 2026-11-18: the automatic Apply (debounce, the newer change drops the older run) moved to `ApplyScheduler` and `Config.typesToApply(after:)` in `STLerCore`, with checks in `Tests/SelfCheck`.
+- Still open: move the request/confirm flow (scope change, count, pending action) out of `SettingsModel` into `STLerCore` as a plain type with a completion callback, then test the order "count finished, then confirmation offered".
 - Until then, changes to `SettingsModel` need a manual look at the window.
