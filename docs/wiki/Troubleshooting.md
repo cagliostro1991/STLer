@@ -1,8 +1,8 @@
 # Troubleshooting
 
 ## An icon did not appear or is grey
-- Is the type switched on, and was **Apply** pressed after the last change? The floating panel says so when settings are not applied yet.
-- The file is in a folder that is not in General's scope? Apply only works inside the scope. `stler follow` works on any folder you open in Finder.
+- Is the type switched on? Changed settings apply by themselves a second after the last change; the journal (bottom right) shows the job. **Regenerate** on the type's page draws every icon again.
+- The file is in a folder that is not in General's scope? The window only works inside the scope. `stler follow` works on any folder you open in Finder.
 - Finder caches icons. Close and reopen the window, or move away and back to the folder.
 - The journal shows a failure? Open it (bottom right) and read the line. Copy it into a [bug report](https://github.com/cagliostro1991/STLer/issues/new?template=bug_report.yml).
 
