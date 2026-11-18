@@ -23,6 +23,8 @@ private extension FileType {
         case .stl: "cube.fill"
         case .threeMF: "square.stack.3d.up.fill"
         case .step: "cube.transparent.fill"
+        case .obj: "pyramid.fill"
+        case .ply: "circle.hexagongrid.fill"
         }
     }
 }
@@ -381,7 +383,7 @@ struct SettingsView: View {
                     )
                     .disabled(model.config[type].color == "system")
                     if type == .threeMF { modelColorsSlider(type) }
-                    if type != .stl { limitPicker(type) }
+                    if type == .threeMF || type == .step { limitPicker(type) }
                 }
                 labelSection(type)
                 Section("Icons") { actionsPanel(type) }

@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [semver]
 
 ## Unreleased
 
+- OBJ and PLY icons, off by default (switch them on on their own page in the sidebar). They are drawn Z up like STL. The preview sample for them is exported from the bundled STL on first use.
+
 ## 0.1.0-beta.2 (2026-11-18)
 
 - Accessibility: icon-only buttons have labels, status text keeps its contrast (only the symbol is coloured), "Off" is written in the sidebar instead of shown by colour alone, sliders show their value, Reduce Motion is respected.

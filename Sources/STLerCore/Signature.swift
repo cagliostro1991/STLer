@@ -13,7 +13,9 @@ enum Signature {
         var parts = [
             "v6", type.rawValue, style.view.rawValue, style.projection.rawValue, style.color,
         ]
-        if type != .stl { parts += [String(style.limit), String(style.modelColors)] }
+        if type == .threeMF || type == .step {
+            parts += [String(style.limit), String(style.modelColors)]
+        }
         parts += [
             label.corner.rawValue, label.textColor, label.backgroundColor,
             String(label.cornerRadius), String(label.opacity),

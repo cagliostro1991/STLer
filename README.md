@@ -18,12 +18,12 @@ file's custom icon via `NSWorkspace.setIcon`.
 
 ## Formats
 
-STL, 3MF and STEP work today. What could come next, as a traffic light: 🟢 done or planned, 🟡 maybe, 🔴 unlikely because the format is closed or the licence is restrictive.
+STL, 3MF and STEP work today, and OBJ and PLY can be switched on. What could come next, as a traffic light: 🟢 done or planned, 🟡 maybe, 🔴 unlikely because the format is closed or the licence is restrictive.
 
 | Format | Light | Notes |
 |---|---|---|
 | STL, 3MF, STEP/STP | 🟢 Done | |
-| OBJ, PLY | 🟢 Planned | read by macOS itself, same path as STL |
+| OBJ, PLY | 🟢 Done (off by default) | switch them on on their page; drawn Z up like STL, so a Y-up model from a 3D app may lie on its side |
 | IGES/IGS | 🟢 Planned | same engines as STEP, another reader |
 | AMF | 🟡 Maybe | open XML like 3MF, needs its own loader, little used |
 | F3D (Fusion) | 🟡 Maybe | only the embedded preview picture is readable, so the icon would not be ours |
@@ -59,7 +59,7 @@ Only the Command Line Tools are required; the app is ad-hoc signed. `swift build
 
 ## Settings window
 
-`STLer.app` looks like System Settings: a sidebar with General, STL, 3MF and STEP (each type's tile has the type's colour; a type that is off is gray and marked Off). Each file type page has its own switch, view (isometric, front, back, left, right, top, bottom), projection (orthographic or perspective), colour and format label (position, text colour, background colour, corner radius, opacity), plus Clear and Regenerate buttons. Changed settings apply on their own a second after your last change (a newer change cancels the older job and starts over), Regenerate draws every icon again, and Clear asks first. All of it runs as queued background jobs: the window never blocks, and the journal (icon at the bottom) shows finished, running and waiting jobs in one stream together with what `stler follow` did. On the first launch a welcome sheet explains what the app does and why the command line tool is needed (the question mark in the header shows it again). The header shows a green tick when `stler follow` runs as a LaunchAgent and an orange warning when it does not; clicking it explains what `follow` is for and leads to General, which has the status and an Install button that runs `stler install` in Terminal; it is checked at start, when the window gets focus and every 10 seconds. General holds the scope the buttons work on (any number of chosen folders, or your home folder with a confirmation that shows the file count) and how deep `follow` goes. Adding a folder starts rendering it at once. The preview on every page is a 3DBenchy variant rendered with that page's settings: the original STL, a 3MF with three plates (1, 2 and 3 boats, painted along different axes) and a STEP assembly of separate parts. "Choose sample..." swaps in any file of that type.
+`STLer.app` looks like System Settings: a sidebar with General, STL, 3MF, STEP, OBJ and PLY (each type's tile has the type's colour; a type that is off is gray and marked Off). Each file type page has its own switch, view (isometric, front, back, left, right, top, bottom), projection (orthographic or perspective), colour and format label (position, text colour, background colour, corner radius, opacity), plus Clear and Regenerate buttons. Changed settings apply on their own a second after your last change (a newer change cancels the older job and starts over), Regenerate draws every icon again, and Clear asks first. All of it runs as queued background jobs: the window never blocks, and the journal (icon at the bottom) shows finished, running and waiting jobs in one stream together with what `stler follow` did. On the first launch a welcome sheet explains what the app does and why the command line tool is needed (the question mark in the header shows it again). The header shows a green tick when `stler follow` runs as a LaunchAgent and an orange warning when it does not; clicking it explains what `follow` is for and leads to General, which has the status and an Install button that runs `stler install` in Terminal; it is checked at start, when the window gets focus and every 10 seconds. General holds the scope the buttons work on (any number of chosen folders, or your home folder with a confirmation that shows the file count) and how deep `follow` goes. Adding a folder starts rendering it at once. The preview on every page is a 3DBenchy variant rendered with that page's settings: the original STL, a 3MF with three plates (1, 2 and 3 boats, painted along different axes) and a STEP assembly of separate parts. "Choose sample..." swaps in any file of that type.
 
 ## CLI
 
@@ -83,7 +83,7 @@ stler config get [key] | set <key> <value>
 
 | key | values | default |
 | --- | --- | --- |
-| `<type>.enabled` | `stl`, `3mf`, `step` switch (`step` needs its engine) | stl, 3mf on; step off |
+| `<type>.enabled` | `stl`, `3mf`, `step`, `obj`, `ply` switch (`step` needs its engine) | stl, 3mf on; step, obj, ply off |
 | `<type>.view` | `iso`, `front`, `back`, `left`, `right`, `top`, `bottom` | `iso` |
 | `<type>.projection` | `orthographic`, `perspective` | `orthographic` |
 | `<type>.color` | `system` (system gray) or `#RRGGBB` | per type: STL `#4f8ff7`, 3MF `#f59e42`, STEP `#a66cf0` |
