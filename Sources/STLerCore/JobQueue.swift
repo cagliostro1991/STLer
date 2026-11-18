@@ -43,7 +43,9 @@ final class JobQueue {
 
     /// Adds a job at the end of the queue.
     /// - Parameter work: Runs on the worker thread; its return value becomes the job's summary.
-    func enqueue(_ title: String, work: @escaping (Reporter) -> String) {
+    /// - Returns: The job's id, for `cancel`.
+    @discardableResult
+    func enqueue(_ title: String, work: @escaping (Reporter) -> String) -> UUID {
         let job = Job(title: title)
         change { $0.append(job) }
         group.enter()
@@ -63,6 +65,7 @@ final class JobQueue {
             }
             self.group.leave()
         }
+        return job.id
     }
 
     /// Cancels one job: a waiting one is dropped and never runs, a running one is asked to stop at its next file.
