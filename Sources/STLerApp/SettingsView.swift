@@ -30,7 +30,9 @@ private extension FileType {
 /// Lowercase `#rrggbb` for a color picked in the UI.
 private func hexString(_ color: NSColor) -> String {
     let c = color.usingColorSpace(.sRGB) ?? color
-    return String(format: "#%02x%02x%02x", Int((c.redComponent * 255).rounded()), Int((c.greenComponent * 255).rounded()), Int((c.blueComponent * 255).rounded()))
+    return String(
+        format: "#%02x%02x%02x", Int((c.redComponent * 255).rounded()),
+        Int((c.greenComponent * 255).rounded()), Int((c.blueComponent * 255).rounded()))
 }
 
 /// Rounded colored tile with a white symbol, like the icons in System Settings.
@@ -54,7 +56,11 @@ private struct StatusLabel: View {
     let tint: Color
 
     var body: some View {
-        Label { Text(text) } icon: { Image(systemName: symbol).foregroundStyle(tint) }
+        Label {
+            Text(text)
+        } icon: {
+            Image(systemName: symbol).foregroundStyle(tint)
+        }
     }
 }
 
@@ -65,12 +71,20 @@ private struct InfoButton: View {
     let text: String
 
     var body: some View {
-        Button { model.infoShown = model.infoShown == id ? nil : id } label: {
-            Image(systemName: "info.circle").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle())
+        Button {
+            model.infoShown = model.infoShown == id ? nil : id
+        } label: {
+            Image(systemName: "info.circle").frame(minWidth: 20, minHeight: 20).contentShape(
+                Rectangle())
         }
         .buttonStyle(.borderless)
         .accessibilityLabel("More information")
-        .popover(isPresented: Binding(get: { model.infoShown == id }, set: { if !$0, model.infoShown == id { model.infoShown = nil } }), arrowEdge: .trailing) {
+        .popover(
+            isPresented: Binding(
+                get: { model.infoShown == id },
+                set: { if !$0, model.infoShown == id { model.infoShown = nil } }),
+            arrowEdge: .trailing
+        ) {
             Text(text)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
@@ -90,13 +104,21 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: selection) {
-                Label { Text("General") } icon: { SidebarIcon(symbol: "gearshape.fill", tint: .gray) }
-                    .tag(SettingsModel.Page.general)
+                Label {
+                    Text("General")
+                } icon: {
+                    SidebarIcon(symbol: "gearshape.fill", tint: .gray)
+                }
+                .tag(SettingsModel.Page.general)
                 Section("File types") {
                     ForEach(FileType.allCases, id: \.self) { type in
-                        Label { Text(type.title) } icon: { SidebarIcon(symbol: type.symbol, tint: sidebarTint(type)) }
-                            .badge(isOn(type) ? nil : Text("Off"))
-                            .tag(SettingsModel.Page.type(type))
+                        Label {
+                            Text(type.title)
+                        } icon: {
+                            SidebarIcon(symbol: type.symbol, tint: sidebarTint(type))
+                        }
+                        .badge(isOn(type) ? nil : Text("Off"))
+                        .tag(SettingsModel.Page.type(type))
                     }
                 }
             }
@@ -111,13 +133,21 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) { agentButton }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { model.showWelcome = true } label: { Label("What is STLer?", systemImage: "questionmark.circle").labelStyle(.iconOnly) }.help("What is STLer?")
+                    Button {
+                        model.showWelcome = true
+                    } label: {
+                        Label("What is STLer?", systemImage: "questionmark.circle").labelStyle(
+                            .iconOnly)
+                    }.help("What is STLer?")
                 }
             }
         }
         .frame(minWidth: 780, minHeight: 560)
         .sheet(isPresented: $model.showWelcome) { welcome }
-        .confirmationDialog(confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible, presenting: model.pending) { _ in
+        .confirmationDialog(
+            confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible,
+            presenting: model.pending
+        ) { _ in
             Button("Clear", role: .destructive) { model.confirmPending() }
         } message: { pending in
             Text(confirmationMessage(pending))
@@ -150,22 +180,30 @@ struct SettingsView: View {
     private var generalPage: some View {
         Form {
             Section("Where icons are set") {
-                Text("Your settings apply to model files here on their own, and replace icons set by other tools. Clear asks first.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Your settings apply to model files here on their own, and replace icons set by other tools. Clear asks first."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
                 Picker("Scope", selection: scopeSelection) {
                     Text("Chosen folders").tag(Config.Scope.folder)
                     Text("Home folder").tag(Config.Scope.home)
                 }
                 .pickerStyle(.segmented)
                 if model.config.scope == .folder {
-                    ForEach(Array(model.config.scopeFolders.enumerated()), id: \.offset) { index, folder in
+                    ForEach(Array(model.config.scopeFolders.enumerated()), id: \.offset) {
+                        index, folder in
                         HStack {
                             Text(folder).lineLimit(1).truncationMode(.middle)
                             Spacer()
-                            Button { model.removeScopeFolder(at: index) } label: { Image(systemName: "minus.circle").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle()) }
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Remove \((folder as NSString).lastPathComponent)")
+                            Button {
+                                model.removeScopeFolder(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle").frame(minWidth: 20, minHeight: 20)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Remove \((folder as NSString).lastPathComponent)")
                         }
                     }
                     HStack {
@@ -183,22 +221,40 @@ struct SettingsView: View {
             Section("When I open a file") {
                 HStack {
                     Toggle("Give a file its icon when I open it", isOn: $model.config.followOpened)
-                    InfoButton(model: model, id: "opened", text: "Works wherever the file is: in any folder, or on a connected drive such as a flash drive, even when no Finder window shows it. The icon appears a few seconds after you open the file. It needs the background helper (see below), and it only sees places that Spotlight indexes.")
+                    InfoButton(
+                        model: model, id: "opened",
+                        text:
+                            "Works wherever the file is: in any folder, or on a connected drive such as a flash drive, even when no Finder window shows it. The icon appears a few seconds after you open the file. It needs the background helper (see below), and it only sees places that Spotlight indexes."
+                    )
                 }
                 HStack {
-                    Toggle("Also the other models in its folder", isOn: $model.config.followOpenedFolder)
-                        .disabled(!model.config.followOpened)
-                    InfoButton(model: model, id: "siblings", text: "After the file itself, the other STL, 3MF and STEP files that lie in the same folder get icons too. Only that one folder is used, subfolders are left alone, and at most \(FileScanner.siblingLimit) files at a time, so opening one file never starts a long job.")
+                    Toggle(
+                        "Also the other models in its folder",
+                        isOn: $model.config.followOpenedFolder
+                    )
+                    .disabled(!model.config.followOpened)
+                    InfoButton(
+                        model: model, id: "siblings",
+                        text:
+                            "After the file itself, the other STL, 3MF and STEP files that lie in the same folder get icons too. Only that one folder is used, subfolders are left alone, and at most \(FileScanner.siblingLimit) files at a time, so opening one file never starts a long job."
+                    )
                 }
                 if model.config.followOpened, model.agent != .running {
-                    StatusLabel(text: "The background helper is not running, so nothing happens yet.", symbol: "exclamationmark.triangle.fill", tint: .orange)
-                        .font(.callout)
+                    StatusLabel(
+                        text: "The background helper is not running, so nothing happens yet.",
+                        symbol: "exclamationmark.triangle.fill", tint: .orange
+                    )
+                    .font(.callout)
                 }
             }
             Section("Background helper") {
                 LabeledContent("Helper") {
                     HStack {
-                        StatusLabel(text: followStatusText, symbol: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: model.agent == .running ? .green : .orange)
+                        StatusLabel(
+                            text: followStatusText,
+                            symbol: model.agent == .running
+                                ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                            tint: model.agent == .running ? .green : .orange)
                         InfoButton(model: model, id: "helper", text: Self.followExplanation)
                     }
                 }
@@ -217,36 +273,57 @@ struct SettingsView: View {
                         ForEach(2...5, id: \.self) { Text("\($0) levels").tag($0) }
                         Text("Unlimited").tag(0)
                     }
-                    InfoButton(model: model, id: "depth", text: "How deep the helper goes into a folder when you open it in Finder.")
+                    InfoButton(
+                        model: model, id: "depth",
+                        text: "How deep the helper goes into a folder when you open it in Finder.")
                 }
             }
             Section("About") {
                 LabeledContent("STLer") { Text(AppVersion.current).foregroundStyle(.secondary) }
                 HStack {
-                    Button("Check for Updates") { model.checkForUpdate() }.disabled(model.checkingUpdate)
+                    Button("Check for Updates") { model.checkForUpdate() }.disabled(
+                        model.checkingUpdate)
                     if model.checkingUpdate { ProgressView().controlSize(.small) }
                     switch model.update {
-                    case .upToDate?: Text("You have the latest version.").foregroundStyle(.secondary)
+                    case .upToDate?:
+                        Text("You have the latest version.").foregroundStyle(.secondary)
                     case .available(let release)?:
-                        Link("Version \(release.tag) is available: open the download page", destination: release.url)
-                    case .failed(let message)?: StatusLabel(text: message, symbol: "exclamationmark.triangle.fill", tint: .orange)
+                        Link(
+                            "Version \(release.tag) is available: open the download page",
+                            destination: release.url)
+                    case .failed(let message)?:
+                        StatusLabel(
+                            text: message, symbol: "exclamationmark.triangle.fill", tint: .orange)
                     case nil: EmptyView()
                     }
                 }
                 HStack {
-                    Link("Report a problem", destination: Feedback.issueURL(template: "bug_report.yml"))
+                    Link(
+                        "Report a problem",
+                        destination: Feedback.issueURL(template: "bug_report.yml"))
                     Link("Ask or suggest", destination: Feedback.discussionURL(category: "q-a"))
-                    Link("Help and FAQ", destination: URL(string: "https://github.com/\(UpdateChecker.repository)/wiki")!)
+                    Link(
+                        "Help and FAQ",
+                        destination: URL(
+                            string: "https://github.com/\(UpdateChecker.repository)/wiki")!)
                 }
                 HStack {
-                    Toggle("Check for updates when the window opens", isOn: $model.config.checkUpdates)
-                    InfoButton(model: model, id: "updates", text: "Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent.")
+                    Toggle(
+                        "Check for updates when the window opens", isOn: $model.config.checkUpdates)
+                    InfoButton(
+                        model: model, id: "updates",
+                        text:
+                            "Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent."
+                    )
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear { model.estimateHomeIfNeeded() }
-        .confirmationDialog("Use your home folder as the scope?", isPresented: $model.confirmingHome, titleVisibility: .visible) {
+        .confirmationDialog(
+            "Use your home folder as the scope?", isPresented: $model.confirmingHome,
+            titleVisibility: .visible
+        ) {
             Button("Use home folder") { model.confirmHomeScope() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -259,15 +336,23 @@ struct SettingsView: View {
         Binding(
             get: { model.config.scope },
             set: { scope in
-                if scope == .home, model.config.scope != .home { model.proposeHomeScope() } else { model.config.scope = scope }
+                if scope == .home, model.config.scope != .home {
+                    model.proposeHomeScope()
+                } else {
+                    model.config.scope = scope
+                }
             })
     }
 
     private var homeSummary: String {
-        guard let estimate = model.homeEstimate else { return "Counting model files in your home folder ..." }
-        let parts = FileType.allCases.map { "\($0.title) \(estimate[$0] ?? 0)" }.joined(separator: ", ")
+        guard let estimate = model.homeEstimate else {
+            return "Counting model files in your home folder ..."
+        }
+        let parts = FileType.allCases.map { "\($0.title) \(estimate[$0] ?? 0)" }.joined(
+            separator: ", ")
         let total = estimate.values.reduce(0, +)
-        return "About \(total) model files in your home folder (\(parts)), counted from the Spotlight index, so unindexed files are missed."
+        return
+            "About \(total) model files in your home folder (\(parts)), counted from the Spotlight index, so unindexed files are missed."
     }
 
     private func typePage(_ type: FileType) -> some View {
@@ -286,11 +371,15 @@ struct SettingsView: View {
                         ForEach(ViewAngle.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     Picker("Projection", selection: style(type, \.projection)) {
-                        ForEach(Projection.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                        ForEach(Projection.allCases, id: \.self) {
+                            Text($0.rawValue.capitalized).tag($0)
+                        }
                     }
                     Toggle("System default color", isOn: systemColor(type))
-                    ColorPicker("Color", selection: colorBinding(type, \.color), supportsOpacity: false)
-                        .disabled(model.config[type].color == "system")
+                    ColorPicker(
+                        "Color", selection: colorBinding(type, \.color), supportsOpacity: false
+                    )
+                    .disabled(model.config[type].color == "system")
                     if type == .threeMF { modelColorsSlider(type) }
                     if type != .stl { limitPicker(type) }
                 }
@@ -303,16 +392,21 @@ struct SettingsView: View {
 
     /// How much of the colors stored in the file shows instead of the single fill color.
     private func modelColorsSlider(_ type: FileType) -> some View {
-        let percent = Binding<Double>(get: { Double(model.config[type].modelColors) }, set: { model.config[type].modelColors = Int($0) })
+        let percent = Binding<Double>(
+            get: { Double(model.config[type].modelColors) },
+            set: { model.config[type].modelColors = Int($0) })
         return VStack(alignment: .leading, spacing: 2) {
             LabeledContent("Model colors") {
                 HStack {
                     Slider(value: percent, in: 0...100, step: 5).frame(width: 180)
-                    Text("\(model.config[type].modelColors)%").monospacedDigit().frame(width: 40, alignment: .trailing)
+                    Text("\(model.config[type].modelColors)%").monospacedDigit().frame(
+                        width: 40, alignment: .trailing)
                 }
             }
-            Text("0% paints everything with the fill color. Higher values show the colors stored in the file (3MF materials, Bambu/Orca filaments); parts without a color keep the fill.")
-                .font(.caption).foregroundStyle(.secondary)
+            Text(
+                "0% paints everything with the fill color. Higher values show the colors stored in the file (3MF materials, Bambu/Orca filaments); parts without a color keep the fill."
+            )
+            .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -320,9 +414,13 @@ struct SettingsView: View {
     private func limitPicker(_ type: FileType) -> some View {
         let choices = type == .threeMF ? [1, 2, 3] : [5, 10, 25, 50, 100, 250]
         let current = model.config[type].limit
-        return Picker(type == .threeMF ? "Plates to show" : "Parts to show", selection: style(type, \.limit)) {
+        return Picker(
+            type == .threeMF ? "Plates to show" : "Parts to show", selection: style(type, \.limit)
+        ) {
             Text("All").tag(0)
-            ForEach(choices + (current == 0 || choices.contains(current) ? [] : [current]), id: \.self) { Text("First \($0)").tag($0) }
+            ForEach(
+                choices + (current == 0 || choices.contains(current) ? [] : [current]), id: \.self
+            ) { Text("First \($0)").tag($0) }
         }
     }
 
@@ -353,7 +451,9 @@ struct SettingsView: View {
                     if let path = model.freecad {
                         Text(path).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     } else {
-                        StatusLabel(text: "Not found", symbol: "exclamationmark.triangle.fill", tint: .orange)
+                        StatusLabel(
+                            text: "Not found", symbol: "exclamationmark.triangle.fill",
+                            tint: .orange)
                     }
                 }
                 HStack {
@@ -367,9 +467,12 @@ struct SettingsView: View {
             } else {
                 LabeledContent("OpenCASCADE") {
                     if model.stepReady {
-                        Text(OpenCascade.prefix ?? "").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                        Text(OpenCascade.prefix ?? "").foregroundStyle(.secondary).lineLimit(1)
+                            .truncationMode(.middle)
                     } else {
-                        StatusLabel(text: "Not installed", symbol: "exclamationmark.triangle.fill", tint: .orange)
+                        StatusLabel(
+                            text: "Not installed", symbol: "exclamationmark.triangle.fill",
+                            tint: .orange)
                     }
                 }
                 if !model.stepReady {
@@ -380,13 +483,21 @@ struct SettingsView: View {
                 }
             }
             HStack {
-                Text("Use either FreeCAD or OpenCASCADE, not both.").font(.callout).foregroundStyle(.secondary)
-                InfoButton(model: model, id: "engine", text: model.config.stepEngine == .freecad
-                    ? "STEP files are converted with FreeCAD (about 2 GB). Use either FreeCAD or OpenCASCADE, not both."
-                    : "STEP files are converted with the OpenCASCADE library, installed by Homebrew in Terminal. Use either FreeCAD or OpenCASCADE, not both.")
+                Text("Use either FreeCAD or OpenCASCADE, not both.").font(.callout).foregroundStyle(
+                    .secondary)
+                InfoButton(
+                    model: model, id: "engine",
+                    text: model.config.stepEngine == .freecad
+                        ? "STEP files are converted with FreeCAD (about 2 GB). Use either FreeCAD or OpenCASCADE, not both."
+                        : "STEP files are converted with the OpenCASCADE library, installed by Homebrew in Terminal. Use either FreeCAD or OpenCASCADE, not both."
+                )
             }
         }
-        .onAppear { if model.config.stepEngine == .freecad, model.freecad == nil { model.searchFreecad(silent: true) } }
+        .onAppear {
+            if model.config.stepEngine == .freecad, model.freecad == nil {
+                model.searchFreecad(silent: true)
+            }
+        }
     }
 
     private func labelSection(_ type: FileType) -> some View {
@@ -395,18 +506,24 @@ struct SettingsView: View {
                 ForEach(LabelCorner.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             if model.config[type].label.corner != .off {
-                ColorPicker("Text color", selection: colorBinding(type, \.label.textColor), supportsOpacity: false)
-                ColorPicker("Background color", selection: colorBinding(type, \.label.backgroundColor), supportsOpacity: false)
+                ColorPicker(
+                    "Text color", selection: colorBinding(type, \.label.textColor),
+                    supportsOpacity: false)
+                ColorPicker(
+                    "Background color", selection: colorBinding(type, \.label.backgroundColor),
+                    supportsOpacity: false)
                 LabeledContent("Corner radius") {
                     HStack {
                         Slider(value: radiusBinding(type), in: 0...50, step: 1).frame(width: 180)
-                        Text("\(model.config[type].label.cornerRadius) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
+                        Text("\(model.config[type].label.cornerRadius) pt").monospacedDigit().frame(
+                            width: 44, alignment: .trailing)
                     }
                 }
                 LabeledContent("Opacity") {
                     HStack {
                         Slider(value: label(type, \.opacity), in: 0...1).frame(width: 180)
-                        Text("\(Int((model.config[type].label.opacity * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                        Text("\(Int((model.config[type].label.opacity * 100).rounded()))%")
+                            .monospacedDigit().frame(width: 44, alignment: .trailing)
                     }
                 }
             }
@@ -421,16 +538,23 @@ struct SettingsView: View {
                     if let preview = model.preview {
                         Image(nsImage: preview).resizable().scaledToFit()
                     } else {
-                        RoundedRectangle(cornerRadius: 12).fill(.quaternary).overlay(Text(model.previewNote ?? "...").font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary).padding(8))
+                        RoundedRectangle(cornerRadius: 12).fill(.quaternary).overlay(
+                            Text(model.previewNote ?? "...").font(.callout).multilineTextAlignment(
+                                .center
+                            ).foregroundStyle(.secondary).padding(8))
                     }
                 }
                 .frame(width: 200, height: 200)
                 .opacity(model.previewBusy ? 0.45 : 1)
                 .overlay { if model.previewBusy { ProgressView().controlSize(.large) } }
                 HStack {
-                    Text(model.sample?.lastPathComponent ?? "No sample").font(.callout).lineLimit(1).truncationMode(.middle)
+                    Text(model.sample?.lastPathComponent ?? "No sample").font(.callout).lineLimit(1)
+                        .truncationMode(.middle)
                     Button("Choose sample...") { model.chooseSample() }.controlSize(.small)
-                    if model.hasCustomSample { Button("Benchy") { model.resetSample() }.controlSize(.small).help("Back to the bundled sample") }
+                    if model.hasCustomSample {
+                        Button("Benchy") { model.resetSample() }.controlSize(.small).help(
+                            "Back to the bundled sample")
+                    }
                 }
             }
             Spacer()
@@ -439,10 +563,12 @@ struct SettingsView: View {
 
     private func welcomeBlock(_ symbol: String, _ title: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).font(.title2).foregroundStyle(Color.accentColor).frame(width: 30)
+            Image(systemName: symbol).font(.title2).foregroundStyle(Color.accentColor).frame(
+                width: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.headline)
-                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(
+                    horizontal: false, vertical: true)
             }
         }
     }
@@ -451,12 +577,18 @@ struct SettingsView: View {
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Welcome to STLer").font(.title.bold())
-            welcomeBlock("cube.transparent", "What it does",
-                "macOS shows STL, 3MF and STEP files with a plain generic icon. STLer draws a small picture of the model and sets it as the file's icon in Finder.")
-            welcomeBlock("paintbrush", "How it works",
-                "The model is rendered off-screen in the view and color you choose for each file type. The file itself and its modification date stay as they were, and Clear removes the icons again.")
-            welcomeBlock("terminal", "Why a background helper",
-                "Your settings apply to the files that exist now. For files that arrive later, such as downloads or a folder you open in Finder, a small helper (the stler command) keeps watching, also when this window is closed. Setup installs it so macOS starts it at login.")
+            welcomeBlock(
+                "cube.transparent", "What it does",
+                "macOS shows STL, 3MF and STEP files with a plain generic icon. STLer draws a small picture of the model and sets it as the file's icon in Finder."
+            )
+            welcomeBlock(
+                "paintbrush", "How it works",
+                "The model is rendered off-screen in the view and color you choose for each file type. The file itself and its modification date stay as they were, and Clear removes the icons again."
+            )
+            welcomeBlock(
+                "terminal", "Why a background helper",
+                "Your settings apply to the files that exist now. For files that arrive later, such as downloads or a folder you open in Finder, a small helper (the stler command) keeps watching, also when this window is closed. Setup installs it so macOS starts it at login."
+            )
             HStack {
                 Spacer()
                 Button("Not now") { model.dismissWelcome(setup: false) }
@@ -469,25 +601,46 @@ struct SettingsView: View {
         .frame(width: 560)
     }
 
-    private static let followExplanation = "The background helper (the stler follow command) gives new and changed STL, 3MF and STEP files their icons when you open a folder in Finder, so you do not have to do anything. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
+    private static let followExplanation =
+        "The background helper (the stler follow command) gives new and changed STL, 3MF and STEP files their icons when you open a folder in Finder, so you do not have to do anything. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
 
     private var followStatusText: String {
-        model.agent == .running ? "Running" : model.agent == .stopped ? "Installed, not running" : "Not installed"
+        model.agent == .running
+            ? "Running" : model.agent == .stopped ? "Installed, not running" : "Not installed"
     }
 
     /// Header reminder: a green tick when `stler follow` runs as a LaunchAgent, an orange warning when it is missing or stopped.
     /// Click shows what it is and leads to General, where it can be installed.
     private var agentButton: some View {
-        Button { model.showAgentInfo.toggle() } label: {
-            Label { Text("Helper") } icon: { Image(systemName: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(model.agent == .running ? Color.green : Color.orange) }
-                .labelStyle(.titleAndIcon)
+        Button {
+            model.showAgentInfo.toggle()
+        } label: {
+            Label {
+                Text("Helper")
+            } icon: {
+                Image(
+                    systemName: model.agent == .running
+                        ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                ).foregroundStyle(model.agent == .running ? Color.green : Color.orange)
+            }
+            .labelStyle(.titleAndIcon)
         }
-        .help(model.agent == .running ? "The background helper is installed and running" : "The background helper is not running")
+        .help(
+            model.agent == .running
+                ? "The background helper is installed and running"
+                : "The background helper is not running"
+        )
         .popover(isPresented: $model.showAgentInfo, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 10) {
-                StatusLabel(text: "Background helper: \(followStatusText.lowercased())", symbol: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: model.agent == .running ? .green : .orange)
-                    .font(.headline)
-                Text(Self.followExplanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                StatusLabel(
+                    text: "Background helper: \(followStatusText.lowercased())",
+                    symbol: model.agent == .running
+                        ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                    tint: model.agent == .running ? .green : .orange
+                )
+                .font(.headline)
+                Text(Self.followExplanation).font(.callout).foregroundStyle(.secondary).fixedSize(
+                    horizontal: false, vertical: true)
                 Button(model.agent == .running ? "Open General" : "Set up in General") {
                     model.showAgentInfo = false
                     model.page = .general
@@ -506,7 +659,10 @@ struct SettingsView: View {
             Button {
                 model.showJournal.toggle()
             } label: {
-                Label(model.activeJobs > 0 ? "\(model.activeJobs)" : "", systemImage: "list.bullet.rectangle").frame(minWidth: 20, minHeight: 20)
+                Label(
+                    model.activeJobs > 0 ? "\(model.activeJobs)" : "",
+                    systemImage: "list.bullet.rectangle"
+                ).frame(minWidth: 20, minHeight: 20)
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Journal")
@@ -541,7 +697,9 @@ struct SettingsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.journal.isEmpty {
-                        Text("Nothing yet. Icon changes, Clear and the background helper show up here.").font(.callout).foregroundStyle(.secondary).padding(8)
+                        Text(
+                            "Nothing yet. Icon changes, Clear and the background helper show up here."
+                        ).font(.callout).foregroundStyle(.secondary).padding(8)
                     }
                     ForEach(model.journal) { job in journalRow(job).id(job.id) }
                 }
@@ -549,7 +707,9 @@ struct SettingsView: View {
             }
             .frame(width: 460, height: 300)
             .onChange(of: model.journal) { journal in
-                if let target = journal.first(where: { $0.state == .running }) ?? journal.last { reader.scrollTo(target.id) }
+                if let target = journal.first(where: { $0.state == .running }) ?? journal.last {
+                    reader.scrollTo(target.id)
+                }
             }
         }
     }
@@ -566,28 +726,45 @@ struct SettingsView: View {
                 switch job.state {
                 case .done: Text(job.summary).font(.caption).foregroundStyle(.secondary)
                 case .running:
-                    if job.total > 0 { ProgressView(value: Double(job.done), total: Double(job.total)) }
-                    Text("\(job.done)/\(job.total)  \(job.current)").font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    if job.total > 0 {
+                        ProgressView(value: Double(job.done), total: Double(job.total))
+                    }
+                    Text("\(job.done)/\(job.total)  \(job.current)").font(.caption).foregroundStyle(
+                        .secondary
+                    ).lineLimit(1).truncationMode(.middle)
                 case .queued: Text("Waiting").font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
             if job.state != .done {
-                Button { model.cancel(job) } label: { Image(systemName: "xmark.circle.fill").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle()) }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(job.state == .running ? "Cancel \(job.title)" : "Remove \(job.title) from the queue")
-                    .foregroundStyle(.secondary)
-                    .help(job.state == .running ? "Cancel this job" : "Remove from the queue")
+                Button {
+                    model.cancel(job)
+                } label: {
+                    Image(systemName: "xmark.circle.fill").frame(minWidth: 20, minHeight: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(
+                    job.state == .running
+                        ? "Cancel \(job.title)" : "Remove \(job.title) from the queue"
+                )
+                .foregroundStyle(.secondary)
+                .help(job.state == .running ? "Cancel this job" : "Remove from the queue")
             }
         }
         .padding(6)
-        .background(job.state == .running ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(
+            job.state == .running ? Color.accentColor.opacity(0.15) : .clear,
+            in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: bindings
 
-    private func style<T>(_ type: FileType, _ keyPath: WritableKeyPath<TypeStyle, T>) -> Binding<T> {
-        Binding(get: { model.config[type][keyPath: keyPath] }, set: { model.config[type][keyPath: keyPath] = $0 })
+    private func style<T>(_ type: FileType, _ keyPath: WritableKeyPath<TypeStyle, T>) -> Binding<T>
+    {
+        Binding(
+            get: { model.config[type][keyPath: keyPath] },
+            set: { model.config[type][keyPath: keyPath] = $0 })
     }
 
     /// STEP reads as off (and cannot be switched on) while FreeCAD is missing.
@@ -597,21 +774,32 @@ struct SettingsView: View {
             set: { model.config[type].enabled = $0 })
     }
 
-    private func label<T>(_ type: FileType, _ keyPath: WritableKeyPath<LabelStyle, T>) -> Binding<T> {
-        Binding(get: { model.config[type].label[keyPath: keyPath] }, set: { model.config[type].label[keyPath: keyPath] = $0 })
+    private func label<T>(_ type: FileType, _ keyPath: WritableKeyPath<LabelStyle, T>) -> Binding<T>
+    {
+        Binding(
+            get: { model.config[type].label[keyPath: keyPath] },
+            set: { model.config[type].label[keyPath: keyPath] = $0 })
     }
 
     private func radiusBinding(_ type: FileType) -> Binding<Double> {
-        Binding(get: { Double(model.config[type].label.cornerRadius) }, set: { model.config[type].label.cornerRadius = Int($0.rounded()) })
+        Binding(
+            get: { Double(model.config[type].label.cornerRadius) },
+            set: { model.config[type].label.cornerRadius = Int($0.rounded()) })
     }
 
     private func systemColor(_ type: FileType) -> Binding<Bool> {
-        Binding(get: { model.config[type].color == "system" }, set: { model.config[type].color = $0 ? "system" : type.defaultColor })
+        Binding(
+            get: { model.config[type].color == "system" },
+            set: { model.config[type].color = $0 ? "system" : type.defaultColor })
     }
 
-    private func colorBinding(_ type: FileType, _ keyPath: WritableKeyPath<TypeStyle, String>) -> Binding<Color> {
+    private func colorBinding(_ type: FileType, _ keyPath: WritableKeyPath<TypeStyle, String>)
+        -> Binding<Color>
+    {
         Binding(
-            get: { Color(nsColor: Config.parseColor(model.config[type][keyPath: keyPath]) ?? .gray) },
+            get: {
+                Color(nsColor: Config.parseColor(model.config[type][keyPath: keyPath]) ?? .gray)
+            },
             set: { model.config[type][keyPath: keyPath] = hexString(NSColor($0)) })
     }
 

@@ -11,8 +11,11 @@ enum LaunchAgent {
     /// Copies the running binary to `~/.local/bin/stler`, writes the agent plist and loads it.
     static func install() throws {
         let fileManager = FileManager.default
-        guard let current = Bundle.main.executableURL else { throw CLIError("cannot locate own executable") }
-        try fileManager.createDirectory(at: binaryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let current = Bundle.main.executableURL else {
+            throw CLIError("cannot locate own executable")
+        }
+        try fileManager.createDirectory(
+            at: binaryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if current.resolvingSymlinksInPath().path != binaryURL.path {
             try? fileManager.removeItem(at: binaryURL)
             try fileManager.copyItem(at: current, to: binaryURL)
@@ -27,10 +30,14 @@ enum LaunchAgent {
             "StandardOutPath": logURL.path,
             "StandardErrorPath": logURL.path,
         ]
-        try fileManager.createDirectory(at: plistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: plistURL)
+        try fileManager.createDirectory(
+            at: plistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(
+            to: plistURL)
         launchctl(["bootout", "\(domain)/\(label)"])
-        guard launchctl(["bootstrap", domain, plistURL.path]) == 0 else { throw CLIError("launchctl bootstrap failed") }
+        guard launchctl(["bootstrap", domain, plistURL.path]) == 0 else {
+            throw CLIError("launchctl bootstrap failed")
+        }
         print("installed: \(binaryURL.path), log: \(logURL.path)")
     }
 

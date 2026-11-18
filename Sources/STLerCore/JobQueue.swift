@@ -52,16 +52,25 @@ final class JobQueue {
         worker.async {
             guard self.jobs.contains(where: { $0.id == job.id }) else { self.group.leave(); return }
             self.update(job.id) { $0.state = .running }
-            let summary = work(Reporter(progress: { done, total, file in
-                self.update(job.id) { $0.done = done; $0.total = total; $0.current = file }
-            }, isCancelled: {
-                self.lock.lock(); defer { self.lock.unlock() }
-                return self.cancelled.contains(job.id)
-            }))
-            self.update(job.id) { $0.state = .done; $0.summary = summary; $0.current = ""; $0.finishedAt = Date() }
+            let summary = work(
+                Reporter(
+                    progress: { done, total, file in
+                        self.update(job.id) {
+                            $0.done = done; $0.total = total; $0.current = file
+                        }
+                    },
+                    isCancelled: {
+                        self.lock.lock(); defer { self.lock.unlock() }
+                        return self.cancelled.contains(job.id)
+                    }))
+            self.update(job.id) {
+                $0.state = .done; $0.summary = summary; $0.current = ""; $0.finishedAt = Date()
+            }
             self.change { items in
                 let finished = items.indices.filter { items[$0].state == .done }
-                for index in finished.dropLast(Self.keepFinished).reversed() { items.remove(at: index) }
+                for index in finished.dropLast(Self.keepFinished).reversed() {
+                    items.remove(at: index)
+                }
             }
             self.group.leave()
         }

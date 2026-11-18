@@ -7,30 +7,50 @@ enum FlatGeometry {
     ///   - points: Triangle corners, three per triangle.
     ///   - colors: Optional colour per corner (RGB, 0...1), same count as `points`.
     static func make(points: [SCNVector3], colors: [SIMD3<Float>]? = nil) -> SCNGeometry {
-        var sources = [SCNGeometrySource(vertices: points), SCNGeometrySource(normals: normals(for: points))]
+        var sources = [
+            SCNGeometrySource(vertices: points), SCNGeometrySource(normals: normals(for: points)),
+        ]
         if let colors, colors.count == points.count {
-            sources.append(SCNGeometrySource(
-                data: colors.withUnsafeBufferPointer { Data(buffer: $0) }, semantic: .color, vectorCount: colors.count,
-                usesFloatComponents: true, componentsPerVector: 3, bytesPerComponent: 4, dataOffset: 0, dataStride: MemoryLayout<SIMD3<Float>>.stride))
+            sources.append(
+                SCNGeometrySource(
+                    data: colors.withUnsafeBufferPointer { Data(buffer: $0) }, semantic: .color,
+                    vectorCount: colors.count,
+                    usesFloatComponents: true, componentsPerVector: 3, bytesPerComponent: 4,
+                    dataOffset: 0, dataStride: MemoryLayout<SIMD3<Float>>.stride))
         }
-        return SCNGeometry(sources: sources, elements: [SCNGeometryElement(indices: (0..<Int32(points.count)).map { $0 }, primitiveType: .triangles)])
+        return SCNGeometry(
+            sources: sources,
+            elements: [
+                SCNGeometryElement(
+                    indices: (0..<Int32(points.count)).map { $0 }, primitiveType: .triangles)
+            ])
     }
 
     /// Triangle corners of a geometry that is made of plain triangles, or `nil` for anything else.
     static func corners(of geometry: SCNGeometry) -> [SCNVector3]? {
-        guard let source = geometry.sources(for: .vertex).first, source.usesFloatComponents, source.bytesPerComponent == 4, source.componentsPerVector == 3 else { return nil }
+        guard let source = geometry.sources(for: .vertex).first, source.usesFloatComponents,
+            source.bytesPerComponent == 4, source.componentsPerVector == 3
+        else { return nil }
         let positions: [SCNVector3] = source.data.withUnsafeBytes { raw in
             (0..<source.vectorCount).map { index in
                 let base = source.dataOffset + index * source.dataStride
-                return SCNVector3(CGFloat(raw.load(fromByteOffset: base, as: Float.self)), CGFloat(raw.load(fromByteOffset: base + 4, as: Float.self)), CGFloat(raw.load(fromByteOffset: base + 8, as: Float.self)))
+                return SCNVector3(
+                    CGFloat(raw.load(fromByteOffset: base, as: Float.self)),
+                    CGFloat(raw.load(fromByteOffset: base + 4, as: Float.self)),
+                    CGFloat(raw.load(fromByteOffset: base + 8, as: Float.self)))
             }
         }
         var corners: [SCNVector3] = []
         for element in geometry.elements {
-            guard element.primitiveType == .triangles, element.bytesPerIndex == 2 || element.bytesPerIndex == 4 else { return nil }
+            guard element.primitiveType == .triangles,
+                element.bytesPerIndex == 2 || element.bytesPerIndex == 4
+            else { return nil }
             element.data.withUnsafeBytes { raw in
                 for i in 0..<element.primitiveCount * 3 {
-                    let index = element.bytesPerIndex == 4 ? Int(raw.load(fromByteOffset: i * 4, as: UInt32.self)) : Int(raw.load(fromByteOffset: i * 2, as: UInt16.self))
+                    let index =
+                        element.bytesPerIndex == 4
+                        ? Int(raw.load(fromByteOffset: i * 4, as: UInt32.self))
+                        : Int(raw.load(fromByteOffset: i * 2, as: UInt16.self))
                     if index < positions.count { corners.append(positions[index]) }
                 }
             }
@@ -39,7 +59,9 @@ enum FlatGeometry {
     }
 
     private static func normals(for points: [SCNVector3]) -> [SCNVector3] {
-        func vector(_ p: SCNVector3) -> SIMD3<Double> { SIMD3(Double(p.x), Double(p.y), Double(p.z)) }
+        func vector(_ p: SCNVector3) -> SIMD3<Double> {
+            SIMD3(Double(p.x), Double(p.y), Double(p.z))
+        }
         var normals: [SCNVector3] = []
         normals.reserveCapacity(points.count)
         for i in stride(from: 0, to: points.count, by: 3) {

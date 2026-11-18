@@ -24,7 +24,9 @@ enum FileType: String, CaseIterable {
 
     init?(path: String) {
         let ext = (path as NSString).pathExtension.lowercased()
-        guard let type = Self.allCases.first(where: { $0.extensions.contains(ext) }) else { return nil }
+        guard let type = Self.allCases.first(where: { $0.extensions.contains(ext) }) else {
+            return nil
+        }
         self = type
     }
 }

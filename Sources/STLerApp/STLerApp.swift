@@ -15,20 +15,31 @@ struct STLerApp: App {
                     .disabled(model.checkingUpdate)
             }
             CommandMenu("Icons") {
-                Button("Regenerate") { if let type = model.currentType { model.scheduleApply(type, delay: 0, force: true) } }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(!canRun)
-                Button("Clear...") { if let type = model.currentType { model.requestClear(for: type) } }
-                    .keyboardShortcut(.delete, modifiers: .command)
-                    .disabled(!canRun)
+                Button("Regenerate") {
+                    if let type = model.currentType {
+                        model.scheduleApply(type, delay: 0, force: true)
+                    }
+                }
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!canRun)
+                Button("Clear...") {
+                    if let type = model.currentType { model.requestClear(for: type) }
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!canRun)
                 Divider()
                 Button("Show Journal") { model.showJournal.toggle() }
                     .keyboardShortcut("j", modifiers: [.command, .option])
             }
             CommandGroup(replacing: .help) {
                 Button("What Is STLer?") { model.showWelcome = true }
-                Link("STLer Help", destination: URL(string: "https://github.com/\(UpdateChecker.repository)/wiki")!)
-                Link("Report a Problem...", destination: Feedback.issueURL(template: "bug_report.yml"))
+                Link(
+                    "STLer Help",
+                    destination: URL(string: "https://github.com/\(UpdateChecker.repository)/wiki")!
+                )
+                Link(
+                    "Report a Problem...",
+                    destination: Feedback.issueURL(template: "bug_report.yml"))
             }
         }
     }
