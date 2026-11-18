@@ -3,18 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>STLer: model icons for Finder</title>
-<meta name="description" content="STLer puts a picture of the model on .stl, .3mf and .step files in macOS Finder instead of the generic icon. 3D printing, Bambu Studio and Orca plates, free and open source.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>STLer: Finder icons for STL, 3MF and STEP files</title>
+<meta name="description" content="A picture of the model on every .stl, .3mf and .step file in macOS Finder, instead of the generic icon. Bambu Studio and Orca plates. Free and open source.">
 <link rel="icon" href="icon.png">
 <link rel="canonical" href="https://cagliostro1991.github.io/STLer/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="STLer: model icons for Finder">
+<meta property="og:title" content="STLer: Finder icons for STL, 3MF and STEP files">
 <meta property="og:description" content="STL, 3MF and STEP files show a picture of the model in macOS Finder. Free and open source.">
 <meta property="og:url" content="https://cagliostro1991.github.io/STLer/">
-<meta property="og:image" content="https://cagliostro1991.github.io/STLer/preview.png">
+<meta property="og:image" content="https://cagliostro1991.github.io/STLer/share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Three Finder icons of a 3D boat model, for 3MF, STL and STEP files, each with a format label">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="STLer: Finder icons for STL, 3MF and STEP files">
+<meta name="twitter:description" content="A picture of the model on every 3D file in macOS Finder. Free and open source.">
+<meta name="twitter:image" content="https://cagliostro1991.github.io/STLer/share.jpg">
+<meta name="twitter:image:alt" content="Three Finder icons of a 3D boat model, for 3MF, STL and STEP files, each with a format label">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"STLer","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 13 or newer","description":"Finder icons for STL, 3MF and STEP files on macOS: a picture of the model instead of the generic icon.","url":"https://cagliostro1991.github.io/STLer/","downloadUrl":"https://github.com/cagliostro1991/STLer/releases","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Pavlo Zubenko","url":"https://github.com/cagliostro1991"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"STLer","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 13 or newer","description":"Finder icons for STL, 3MF and STEP files on macOS: a picture of the model instead of the generic icon.","url":"https://cagliostro1991.github.io/STLer/","downloadUrl":"https://github.com/cagliostro1991/STLer/releases","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://cagliostro1991.github.io/STLer/share.jpg","screenshot":"https://cagliostro1991.github.io/STLer/settings-stl.webp","featureList":"Icons from the model itself for STL, 3MF and STEP files; per file type view, projection and color; Bambu Studio and Orca plates; background helper that keeps icons up to date","author":{"@type":"Person","name":"Pavlo Zubenko","url":"https://github.com/cagliostro1991"}}
 </script>
 <style>
   :root {
@@ -29,10 +39,19 @@
   .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
   header.hero { text-align: center; padding: 64px 0 24px; }
   header.hero img.logo { width: 112px; height: 112px; }
-  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.1; margin: 16px 0 8px; letter-spacing: -0.02em; }
+  h1 { font-size: clamp(30px, 5.2vw, 46px); line-height: 1.1; margin: 8px auto 12px; letter-spacing: -0.02em; max-width: 760px; }
   .tagline { color: var(--muted); font-size: clamp(18px, 2.6vw, 22px); max-width: 640px; margin: 0 auto 28px; }
   .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; border: 1px solid var(--line); color: var(--fg); background: var(--card); }
+  .btn { transition: transform .12s ease, background-color .12s ease, border-color .12s ease; }
+  .btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  .skip { position: absolute; left: 12px; top: -48px; background: var(--bg); color: var(--fg); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); z-index: 10; }
+  .skip:focus { top: 12px; }
+  .brand { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 12px 0 0; }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } .btn:hover, .btn:active { transform: none; } }
   .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
   .note { color: var(--muted); font-size: 14px; margin-top: 12px; }
   img.shot { display: block; width: 100%; max-width: 760px; margin: 40px auto 0; border-radius: 14px; border: 1px solid var(--line); }
@@ -53,26 +72,35 @@
   .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
   .dot.green { background: #34c759; } .dot.yellow { background: #ffcc00; } .dot.red { background: #ff453a; }
   .legend { color: var(--muted); font-size: 14.5px; margin-top: 10px; }
+  .gallery { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); margin-top: 20px; }
+  .gallery img { width: 100%; height: auto; display: block; }
+  .split { display: grid; grid-template-columns: 1fr 340px; gap: 32px; align-items: center; }
+  .split img { width: 100%; height: auto; display: block; }
+  @media (max-width: 760px) { .gallery { grid-template-columns: 1fr; max-width: 360px; margin-inline: auto; } .split { grid-template-columns: 1fr; } .split img { max-width: 360px; margin-inline: auto; } }
+  .close { text-align: center; }
   footer { margin-top: 56px; padding: 24px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 <div class="wrap">
 
+<main id="main">
 <header class="hero">
-  <img class="logo" src="icon.png" alt="STLer icon" width="112" height="112">
-  <h1>STLer</h1>
-  <p class="tagline">Your 3D model files show what is inside them. STL, 3MF and STEP icons in Finder, drawn from the model itself.</p>
+  <img class="logo" src="icon.png" alt="" width="112" height="112">
+  <p class="brand">STLer</p>
+  <h1>Finder icons for STL, 3MF and STEP files</h1>
+  <p class="tagline">STLer draws a small picture of the model itself and sets it as the file's icon, so you see what is inside before you open it.</p>
   <div class="buttons">
     <a class="btn primary" href="https://github.com/cagliostro1991/STLer/releases">Download the beta</a>
-    <a class="btn" href="https://github.com/cagliostro1991/STLer">Source on GitHub</a>
+    <a class="btn" href="https://github.com/cagliostro1991/STLer">View the source on GitHub</a>
   </div>
   <p class="note">macOS 13 or newer. Free and open source (MIT). The beta is not notarized yet, see Install.</p>
-  <img class="shot" src="preview.png" alt="Finder with STLer icons: coloured isometric pictures of 3D models">
+  <img class="shot" src="preview.webp" width="1520" height="964" alt="Finder with STLer icons: coloured isometric pictures of a 3D boat model, with a 3MF, an STL and a STEP label">
 </header>
 
 <section>
-  <h2>What you get</h2>
+  <h2>Features</h2>
   <div class="grid">
     <div class="card"><h3>Icons from the model</h3><p>Every <code>.stl</code>, <code>.3mf</code> and <code>.step</code> gets a small picture of its own geometry, from any standard view, orthographic or perspective.</p></div>
     <div class="card"><h3>Your look, per file type</h3><p>Colour, view, an optional format label with its own colours, rounding and opacity. A live preview on a Benchy while you change things.</p></div>
@@ -81,12 +109,28 @@
     <div class="card"><h3>Keeps itself up to date</h3><p>A small background helper gives new downloads, the folder you open in Finder, and files you open from a flash drive their icons.</p></div>
     <div class="card"><h3>Safe by design</h3><p>File contents and modification dates stay as they were. <code>Clear</code> removes only icons STLer made, never ones you set yourself.</p></div>
   </div>
+  <img class="shot" src="list-view.webp" width="1520" height="964" loading="lazy" alt="Finder in list view: small STLer icons of a boat model next to the names of a 3MF, a STEP and an STL file">
+</section>
+
+<section>
+  <h2>A settings page per file type</h2>
+  <p>Each type has its own view, projection, color, format label and a live preview. A change applies to your files on its own a second after you stop.</p>
+  <div class="gallery">
+    <img src="settings-stl.webp" width="640" height="702" loading="lazy" alt="STLer settings for STL files: a blue boat preview with an STL label, and view, projection, color and label options">
+    <img src="settings-3mf.webp" width="640" height="702" loading="lazy" alt="STLer settings for 3MF files: a green boat preview, a model colors slider and a plates to show option">
+    <img src="settings-step.webp" width="640" height="702" loading="lazy" alt="STLer settings for STEP files: an orange boat preview, the FreeCAD or OpenCASCADE engine choice and a parts to show option">
+  </div>
 </section>
 
 <section>
   <h2>How it works</h2>
+  <div class="split">
+    <div>
   <p>macOS has its own thumbnail for STL files, and an app cannot replace it. So STLer renders each model off-screen with SceneKit and sets the picture as the file's own custom icon, the same thing you do by pasting an icon in Get Info, only automatic.</p>
   <p>The app window applies your settings to the files that exist now. The <code>stler</code> command line tool, started at login, keeps watching so files that arrive later get their icons too, also when the window is closed.</p>
+    </div>
+    <img src="settings-general.webp" width="760" height="834" loading="lazy" alt="STLer General page: the folders where icons are set, the background helper running, and update settings">
+  </div>
 </section>
 
 <section>
@@ -122,6 +166,16 @@
   <h2>Privacy</h2>
   <p>STLer works on your machine and sends nothing about you or your files anywhere. The only network request is the optional update check: it asks GitHub for the public list of STLer releases, at most once a day, and you can switch it off in General. OpenCASCADE, if you choose it for STEP, is downloaded by Homebrew in a Terminal window you can watch.</p>
 </section>
+
+<section class="close">
+  <h2>Download STLer for macOS</h2>
+  <p>Free, open source and ready to try. The beta runs on macOS 13 or newer.</p>
+  <div class="buttons">
+    <a class="btn primary" href="https://github.com/cagliostro1991/STLer/releases">Download the beta</a>
+    <a class="btn" href="https://github.com/cagliostro1991/STLer">View the source on GitHub</a>
+  </div>
+</section>
+</main>
 
 <footer>
   <p>STLer is built by <a href="https://github.com/cagliostro1991">Pavlo Zubenko</a>. 3DBenchy by <a href="https://www.3dbenchy.com/">Creative Tools</a> (public domain) is the preview model. The icon pack was generated with Gemini.</p>
