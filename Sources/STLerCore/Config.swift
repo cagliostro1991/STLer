@@ -140,6 +140,9 @@ struct Config: Codable, Equatable {
     var stl = TypeStyle(color: FileType.stl.defaultColor)
     var threeMF = TypeStyle(color: FileType.threeMF.defaultColor, limit: 1)
     var step = TypeStyle(enabled: false, color: FileType.step.defaultColor)
+    /// OBJ and PLY are off until the user switches them on: they are common outside 3D printing too.
+    var obj = TypeStyle(enabled: false, color: FileType.obj.defaultColor)
+    var ply = TypeStyle(enabled: false, color: FileType.ply.defaultColor)
     /// Folder levels processed by `follow`; 0 means unlimited.
     var followDepth = 3
     /// STEP converter. STEP stays off while the chosen one is missing.
@@ -159,7 +162,7 @@ struct Config: Codable, Equatable {
     enum Scope: String, Codable { case folder, home }
 
     private enum CodingKeys: String, CodingKey {
-        case stl, threeMF = "3mf", step, followDepth, checkUpdates, followOpened,
+        case stl, threeMF = "3mf", step, obj, ply, followDepth, checkUpdates, followOpened,
             followOpenedFolder, stepEngine, freecadPath, scope, scopeFolders
     }
 
@@ -178,6 +181,8 @@ struct Config: Codable, Equatable {
             case .stl: stl
             case .threeMF: threeMF
             case .step: step
+            case .obj: obj
+            case .ply: ply
             }
         }
         set {
@@ -185,6 +190,8 @@ struct Config: Codable, Equatable {
             case .stl: stl = newValue
             case .threeMF: threeMF = newValue
             case .step: step = newValue
+            case .obj: obj = newValue
+            case .ply: ply = newValue
             }
         }
     }
@@ -221,6 +228,8 @@ struct Config: Codable, Equatable {
         stl = read(.stl, stl)
         threeMF = read(.threeMF, threeMF)
         step = read(.step, step)
+        obj = read(.obj, obj)
+        ply = read(.ply, ply)
         followDepth = read(.followDepth, followDepth)
         followOpened = read(.followOpened, followOpened)
         checkUpdates = read(.checkUpdates, checkUpdates)

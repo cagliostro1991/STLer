@@ -17,7 +17,7 @@ let usage = """
     views: iso front back left right top bottom
     keys:  followDepth followOpened followOpenedFolder stepEngine (freecad|opencascade) freecadPath scope scopeFolders (comma list)
            <type>.enabled <type>.view <type>.projection <type>.color
-           <type>.label.corner|textColor|backgroundColor|cornerRadius|opacity     (type: stl, 3mf, step)
+           <type>.label.corner|textColor|backgroundColor|cornerRadius|opacity     (type: stl, 3mf, step, obj, ply)
     run flags change every enabled type for this run only; without paths run uses the folder open in Finder (fallback: cwd).
     run skips files already rendered with the same settings; --force re-renders them.
     followDepth: 1 = only the open folder, 2, 3... = levels of subfolders, deep = unlimited.

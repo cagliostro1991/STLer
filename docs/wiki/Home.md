@@ -6,7 +6,7 @@ STLer puts a small picture of the model on `.stl`, `.3mf` and `.step` files in m
 - **New here?** [Getting started](Getting-Started)
 - **Something odd?** [Troubleshooting](Troubleshooting) and the [FAQ](FAQ)
 - **Want to ask, suggest or report?** [Feedback and requests](Feedback-and-Requests)
-- **Formats:** STL, 3MF and STEP today, others are on the traffic-light list in the [README](https://github.com/cagliostro1991/STLer#formats)
+- **Formats:** STL, 3MF and STEP today (OBJ and PLY on request in the app), others are on the traffic-light list in the [README](https://github.com/cagliostro1991/STLer#formats)
 
 Download: [Releases](https://github.com/cagliostro1991/STLer/releases). Source and docs: [the repository](https://github.com/cagliostro1991/STLer).
 

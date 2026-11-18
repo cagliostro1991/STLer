@@ -16,7 +16,7 @@ Yes for the window and for the open Finder folder. On FAT and exFAT drives macOS
 A small background helper that gives new and changed files their icons by itself. Without it, icons appear only for the folders in the window's scope. See [Getting started](Getting-Started).
 
 **Which file types are supported? Can you add mine?**
-STL, 3MF and STEP/STP. The traffic-light list of next candidates is in the [README](https://github.com/cagliostro1991/STLer#formats). Ask for another one with the [format request form](https://github.com/cagliostro1991/STLer/issues/new?template=format_request.yml).
+STL, 3MF and STEP/STP, and OBJ and PLY once you switch them on (their page in the sidebar). The traffic-light list of next candidates is in the [README](https://github.com/cagliostro1991/STLer#formats). Ask for another one with the [format request form](https://github.com/cagliostro1991/STLer/issues/new?template=format_request.yml).
 
 **3MF from Bambu Studio or Orca shows a pile of parts. How do I get one plate?**
 3MF page > "Plates to show": First 1, 2, 3 or All. The "Model colours" slider blends the colours stored in the file with your fill colour.

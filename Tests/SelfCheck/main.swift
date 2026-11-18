@@ -40,7 +40,7 @@ check(
     "config validates enabled")
 let defaultColors = FileType.allCases.map { Config()[$0].color }
 check(
-    Set(defaultColors).count == 3 && defaultColors.allSatisfy(Config.isHex),
+    Set(defaultColors).count == FileType.allCases.count && defaultColors.allSatisfy(Config.isHex),
     "each file type has its own default colour")
 check(
     Config().enabledFormats == ["stl", "3mf"] && c.enabledFormats == ["stl", "3mf", "step"],
@@ -306,7 +306,8 @@ check(
     "limit defaults are 1 plate and all parts, and it is validated")
 check(
     FileType(path: "/a/Model.STP") == .step && FileType(path: "b.3mf") == .threeMF
-        && FileType(path: "c.obj") == nil, "file types are recognised by extension")
+        && FileType(path: "c.OBJ") == .obj && FileType(path: "d.ply") == .ply
+        && FileType(path: "e.dxf") == nil, "file types are recognised by extension")
 
 let sigFile = tmp.appendingPathComponent("sig.stl").path
 try touch(sigFile)
@@ -1173,6 +1174,105 @@ do {
     lock.lock()
     check(!started.contains { $0.0 == .threeMF }, "a cancelled Apply never starts")
     lock.unlock()
+}
+
+// MARK: OBJ and PLY
+
+do {
+    var objConfig = Config()
+    check(
+        !objConfig.obj.enabled && !objConfig.ply.enabled
+            && !Config().enabledFormats.contains("obj"),
+        "OBJ and PLY are off until switched on")
+    check(
+        objConfig.set("obj.enabled", "true") == nil && objConfig.set("ply.color", "#112233") == nil
+            && objConfig.enabledFormats.contains("obj")
+            && !objConfig.enabledFormats.contains("ply"),
+        "OBJ and PLY take settings like the other types")
+    check(
+        Signature.make(for: objConfig, type: .obj) != Signature.make(for: objConfig, type: .ply)
+            && Signature.make(for: objConfig, type: .stl)
+                == Signature.make(for: Config(), type: .stl),
+        "OBJ and PLY signatures are their own and leave STL alone")
+    check(
+        !Signature.make(for: Config(), type: .obj).contains("|0|100|"),
+        "OBJ and PLY have no plate or color settings, like STL")
+
+    let corners = { (a: SIMD3<Double>, c: SIMD3<Double>) in
+        [
+            [a.x, a.y, a.z], [c.x, a.y, a.z], [c.x, c.y, a.z], [a.x, c.y, a.z], [a.x, a.y, c.z],
+            [c.x, a.y, c.z], [c.x, c.y, c.z], [a.x, c.y, c.z],
+        ]
+    }
+    let quads = [
+        [0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7],
+    ]
+    let pillar: Box = (SIMD3(-3, -3, 0), SIMD3(3, 3, 40))
+    let points = corners(pillar.min, pillar.max)
+    let vertices = points.map { "\($0[0]) \($0[1]) \($0[2])" }
+    let objPath = tmp.appendingPathComponent("pillar.obj").path
+    let plyPath = tmp.appendingPathComponent("pillar.ply").path
+    try
+        (vertices.map { "v \($0)" }.joined(separator: "\n") + "\n"
+        + quads.map { "f " + $0.map { String($0 + 1) }.joined(separator: " ") }.joined(
+            separator: "\n") + "\n").write(toFile: objPath, atomically: true, encoding: .utf8)
+    try
+        ([
+            "ply", "format ascii 1.0", "element vertex 8", "property float x", "property float y",
+            "property float z", "element face 6", "property list uchar int vertex_index",
+            "end_header",
+        ]
+        + vertices + quads.map { "4 " + $0.map(String.init).joined(separator: " ") }).joined(
+            separator: "\n"
+        ).appending("\n").write(toFile: plyPath, atomically: true, encoding: .utf8)
+    let stlPath = tmp.appendingPathComponent("pillar-ref.stl").path
+    try writeBoxes([pillar], to: stlPath)
+
+    func picture(_ path: String) -> (aspect: Double, dx: Double, dyUp: Double)? {
+        var options = IconRenderer.Options()
+        options.view = .iso
+        return IconRenderer.render(
+            URL(fileURLWithPath: path), size: CGSize(width: 256, height: 256), options: options
+        ).flatMap(silhouette)
+    }
+    if let reference = picture(stlPath), let obj = picture(objPath), let ply = picture(plyPath) {
+        let close = { (a: (aspect: Double, dx: Double, dyUp: Double)) in
+            abs(a.aspect - reference.aspect) < 0.03 && abs(a.dx - reference.dx) < 0.03
+                && abs(a.dyUp - reference.dyUp) < 0.03
+        }
+        check(close(obj), "an OBJ model is drawn like the same STL (Z up, same view)")
+        check(close(ply), "a PLY model is drawn like the same STL (Z up, same view)")
+    } else {
+        check(false, "OBJ and PLY test files render")
+    }
+
+    let cache = tmp.appendingPathComponent("sample-cache")
+    let sampleBundle = Bundle(path: tmp.appendingPathComponent("SampleBundle.bundle").path)
+    try fm.createDirectory(
+        at: tmp.appendingPathComponent("SampleBundle.bundle"), withIntermediateDirectories: true)
+    check(
+        SampleFiles.url(for: .obj, bundle: sampleBundle ?? .main, cache: cache) == nil
+            && SampleFiles.isGenerated(.obj) && SampleFiles.isGenerated(.ply)
+            && !SampleFiles.isGenerated(.stl),
+        "OBJ and PLY samples are generated and need the bundled STL")
+    // Bundles are cached by path and list their files once, so the one with the STL is a new folder.
+    let fullBundleFolder = tmp.appendingPathComponent("FullBundle.bundle")
+    try fm.createDirectory(at: fullBundleFolder, withIntermediateDirectories: true)
+    try fm.copyItem(
+        atPath: stlPath, toPath: fullBundleFolder.appendingPathComponent("3DBenchy.stl").path)
+    let fullBundle = Bundle(path: fullBundleFolder.path)
+    for type in [FileType.obj, .ply] {
+        let exported = SampleFiles.url(for: type, bundle: fullBundle ?? .main, cache: cache)
+        let exportedPicture = exported.flatMap { picture($0.path) }
+        check(
+            exported?.pathExtension == type.rawValue && exportedPicture != nil,
+            "the \(type.title) sample is exported from the bundled STL and renders")
+        check(
+            exported.map {
+                SampleFiles.url(for: type, bundle: fullBundle ?? .main, cache: cache) == $0
+            }
+                ?? false, "an exported sample is reused")
+    }
 }
 
 try? fm.removeItem(at: tmp)

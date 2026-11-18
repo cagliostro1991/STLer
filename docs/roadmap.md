@@ -22,7 +22,7 @@ Traffic light: 🟢 done or planned, 🟡 maybe, 🔴 unlikely (closed format or
 | Format | Light | Notes |
 |---|---|---|
 | STL, 3MF, STEP/STP | 🟢 Done | |
-| OBJ, PLY | 🟢 Planned | ModelIO reads them, same path as STL |
+| OBJ, PLY | 🟢 Done (off by default) | ModelIO reads them, same path as STL; Z up, an up-axis option is not built yet |
 | IGES/IGS | 🟢 Planned | same engines as STEP (FreeCAD or OpenCASCADE), another reader |
 | AMF | 🟡 Maybe | open XML like 3MF, needs its own loader, little used |
 | F3D (Fusion) | 🟡 Maybe | only the embedded `Previews/small.png` is readable (ADR 0009), so the icon would be Fusion's picture, not ours |

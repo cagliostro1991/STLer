@@ -35,6 +35,7 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var preview: NSImage?
     /// Sample file per type: the bundled Benchy variants unless the user picked one (remembered in `UserDefaults`).
     @Published private(set) var samples: [FileType: URL] = [:]
+    private var defaultSamples: [FileType: URL] = [:]
     /// Why the preview is empty, when it is not just loading.
     @Published private(set) var previewNote: String?
     /// True while a preview is being rendered; the first render of a big 3MF takes a couple of seconds.
@@ -76,12 +77,14 @@ final class SettingsModel: ObservableObject {
 
     init() {
         for type in FileType.allCases {
-            let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map {
-                URL(fileURLWithPath: $0)
+            if SampleFiles.isGenerated(type) {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let url = SampleFiles.url(for: type)
+                    DispatchQueue.main.async { self.useDefaultSample(url, for: type) }
+                }
+            } else {
+                useDefaultSample(SampleFiles.url(for: type), for: type)
             }
-            samples[type] =
-                remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
-                ?? Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
         }
         refreshFreecad()
         refreshPreview()
@@ -198,12 +201,17 @@ final class SettingsModel: ObservableObject {
     var sample: URL? { samples[previewType] }
 
     /// Whether the open page shows a file the user picked instead of the bundled sample.
-    var hasCustomSample: Bool {
-        sample.map {
-            $0
-                != Bundle.main.url(
-                    forResource: "3DBenchy", withExtension: previewType.sampleExtension)
-        } ?? false
+    var hasCustomSample: Bool { sample != nil && sample != defaultSamples[previewType] }
+
+    /// Remembers the bundled sample of `type` and shows it, unless the user picked a file earlier.
+    private func useDefaultSample(_ url: URL?, for type: FileType) {
+        defaultSamples[type] = url
+        let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map {
+            URL(fileURLWithPath: $0)
+        }
+        samples[type] =
+            remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil } ?? url
+        if previewType == type { refreshPreview() }
     }
 
     func chooseSample() {
@@ -219,8 +227,7 @@ final class SettingsModel: ObservableObject {
     func resetSample() {
         let type = previewType
         UserDefaults.standard.removeObject(forKey: "sample.\(type.rawValue)")
-        samples[type] = Bundle.main.url(
-            forResource: "3DBenchy", withExtension: type.sampleExtension)
+        samples[type] = defaultSamples[type]
         refreshPreview()
     }
 
