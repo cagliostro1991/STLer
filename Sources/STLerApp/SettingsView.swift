@@ -27,13 +27,13 @@ private extension FileType {
     }
 }
 
-/// Lowercase `#rrggbb` for a colour picked in the UI.
+/// Lowercase `#rrggbb` for a color picked in the UI.
 private func hexString(_ color: NSColor) -> String {
     let c = color.usingColorSpace(.sRGB) ?? color
     return String(format: "#%02x%02x%02x", Int((c.redComponent * 255).rounded()), Int((c.greenComponent * 255).rounded()), Int((c.blueComponent * 255).rounded()))
 }
 
-/// Rounded coloured tile with a white symbol, like the icons in System Settings.
+/// Rounded colored tile with a white symbol, like the icons in System Settings.
 private struct SidebarIcon: View {
     let symbol: String
     let tint: Color
@@ -44,6 +44,39 @@ private struct SidebarIcon: View {
             .foregroundStyle(.white)
             .frame(width: 22, height: 22)
             .background(tint.gradient, in: RoundedRectangle(cornerRadius: 5))
+    }
+}
+
+/// Status line whose symbol carries the color; the text stays in the primary color so it keeps its contrast.
+private struct StatusLabel: View {
+    let text: String
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        Label { Text(text) } icon: { Image(systemName: symbol).foregroundStyle(tint) }
+    }
+}
+
+/// A small "i" button that opens a popover with a longer explanation, so forms stay short.
+private struct InfoButton: View {
+    @ObservedObject var model: SettingsModel
+    let id: String
+    let text: String
+
+    var body: some View {
+        Button { model.infoShown = model.infoShown == id ? nil : id } label: {
+            Image(systemName: "info.circle").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("More information")
+        .popover(isPresented: Binding(get: { model.infoShown == id }, set: { if !$0, model.infoShown == id { model.infoShown = nil } }), arrowEdge: .trailing) {
+            Text(text)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(14)
+                .frame(width: 340)
+        }
     }
 }
 
@@ -62,6 +95,7 @@ struct SettingsView: View {
                 Section("File types") {
                     ForEach(FileType.allCases, id: \.self) { type in
                         Label { Text(type.title) } icon: { SidebarIcon(symbol: type.symbol, tint: sidebarTint(type)) }
+                            .badge(isOn(type) ? nil : Text("Off"))
                             .tag(SettingsModel.Page.type(type))
                     }
                 }
@@ -77,23 +111,26 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) { agentButton }
                 ToolbarItem(placement: .primaryAction) {
-                    Button { model.showWelcome = true } label: { Image(systemName: "questionmark.circle") }.help("What is STLer?")
+                    Button { model.showWelcome = true } label: { Label("What is STLer?", systemImage: "questionmark.circle").labelStyle(.iconOnly) }.help("What is STLer?")
                 }
             }
         }
         .frame(minWidth: 780, minHeight: 560)
         .sheet(isPresented: $model.showWelcome) { welcome }
-        .confirmationDialog(confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible, presenting: model.pending) { pending in
-            Button(pending.action == .clear ? "Clear" : "Apply", role: pending.action == .clear ? .destructive : nil) { model.confirmPending() }
+        .confirmationDialog(confirmationTitle, isPresented: pendingBinding, titleVisibility: .visible, presenting: model.pending) { _ in
+            Button("Clear", role: .destructive) { model.confirmPending() }
         } message: { pending in
             Text(confirmationMessage(pending))
         }
     }
 
-    /// The type's own colour, gray while the type is switched off.
+    /// The type's own color, gray while the type is switched off.
     private func sidebarTint(_ type: FileType) -> Color {
-        let style = model.config[type]
-        return style.enabled && (type != .step || model.stepReady) ? Color(nsColor: style.nsColor) : .gray
+        isOn(type) ? Color(nsColor: model.config[type].nsColor) : .gray
+    }
+
+    private func isOn(_ type: FileType) -> Bool {
+        model.config[type].enabled && (type != .step || model.stepReady)
     }
 
     private var title: String {
@@ -112,7 +149,10 @@ struct SettingsView: View {
 
     private var generalPage: some View {
         Form {
-            Section("Where Clear and Apply work") {
+            Section("Where icons are set") {
+                Text("Your settings apply to model files here on their own, and replace icons set by other tools. Clear asks first.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 Picker("Scope", selection: scopeSelection) {
                     Text("Chosen folders").tag(Config.Scope.folder)
                     Text("Home folder").tag(Config.Scope.home)
@@ -123,8 +163,9 @@ struct SettingsView: View {
                         HStack {
                             Text(folder).lineLimit(1).truncationMode(.middle)
                             Spacer()
-                            Button { model.removeScopeFolder(at: index) } label: { Image(systemName: "minus.circle") }
+                            Button { model.removeScopeFolder(at: index) } label: { Image(systemName: "minus.circle").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle()) }
                                 .buttonStyle(.borderless)
+                                .accessibilityLabel("Remove \((folder as NSString).lastPathComponent)")
                         }
                     }
                     HStack {
@@ -140,25 +181,26 @@ struct SettingsView: View {
                 }
             }
             Section("When I open a file") {
-                Toggle("Give a file its icon when I open it", isOn: $model.config.followOpened)
-                Text("Works wherever the file is: in any folder, or on a connected drive such as a flash drive, even when no Finder window shows it. The icon appears a few seconds after you open the file. It needs stler follow to be running (see below), and it only sees places that Spotlight indexes.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Toggle("Also the other models in its folder", isOn: $model.config.followOpenedFolder)
-                    .disabled(!model.config.followOpened)
-                Text("After the file itself, the other STL, 3MF and STEP files that lie in the same folder get icons too. Only that one folder is used, subfolders are left alone, and at most \(FileScanner.siblingLimit) files at a time, so opening one file never starts a long job.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Toggle("Give a file its icon when I open it", isOn: $model.config.followOpened)
+                    InfoButton(model: model, id: "opened", text: "Works wherever the file is: in any folder, or on a connected drive such as a flash drive, even when no Finder window shows it. The icon appears a few seconds after you open the file. It needs the background helper (see below), and it only sees places that Spotlight indexes.")
+                }
+                HStack {
+                    Toggle("Also the other models in its folder", isOn: $model.config.followOpenedFolder)
+                        .disabled(!model.config.followOpened)
+                    InfoButton(model: model, id: "siblings", text: "After the file itself, the other STL, 3MF and STEP files that lie in the same folder get icons too. Only that one folder is used, subfolders are left alone, and at most \(FileScanner.siblingLimit) files at a time, so opening one file never starts a long job.")
+                }
                 if model.config.followOpened, model.agent != .running {
-                    Label("stler follow is not running, so nothing happens yet.", systemImage: "exclamationmark.triangle.fill")
+                    StatusLabel(text: "The background helper is not running, so nothing happens yet.", symbol: "exclamationmark.triangle.fill", tint: .orange)
                         .font(.callout)
-                        .foregroundStyle(.orange)
                 }
             }
-            Section("Follow Finder") {
-                LabeledContent("stler follow") {
-                    Text(followStatusText)
-                        .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
+            Section("Background helper") {
+                LabeledContent("Helper") {
+                    HStack {
+                        StatusLabel(text: followStatusText, symbol: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: model.agent == .running ? .green : .orange)
+                        InfoButton(model: model, id: "helper", text: Self.followExplanation)
+                    }
                 }
                 HStack {
                     if model.agent == .notInstalled {
@@ -169,28 +211,25 @@ struct SettingsView: View {
                         Button("Reinstall in Terminal") { model.installFollow() }
                     }
                 }
-                Text(Self.followExplanation)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Picker("Depth", selection: $model.config.followDepth) {
-                    Text("Open folder only").tag(1)
-                    ForEach(2...5, id: \.self) { Text("\($0) levels").tag($0) }
-                    Text("Unlimited").tag(0)
+                HStack {
+                    Picker("Depth", selection: $model.config.followDepth) {
+                        Text("Open folder only").tag(1)
+                        ForEach(2...5, id: \.self) { Text("\($0) levels").tag($0) }
+                        Text("Unlimited").tag(0)
+                    }
+                    InfoButton(model: model, id: "depth", text: "How deep the helper goes into a folder when you open it in Finder.")
                 }
-                Text("How deep `stler follow` goes into a folder when you open it in Finder.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
             Section("About") {
                 LabeledContent("STLer") { Text(AppVersion.current).foregroundStyle(.secondary) }
                 HStack {
-                    Button("Check for updates") { model.checkForUpdate() }.disabled(model.checkingUpdate)
+                    Button("Check for Updates") { model.checkForUpdate() }.disabled(model.checkingUpdate)
                     if model.checkingUpdate { ProgressView().controlSize(.small) }
                     switch model.update {
                     case .upToDate?: Text("You have the latest version.").foregroundStyle(.secondary)
                     case .available(let release)?:
                         Link("Version \(release.tag) is available: open the download page", destination: release.url)
-                    case .failed(let message)?: Text(message).foregroundStyle(.orange)
+                    case .failed(let message)?: StatusLabel(text: message, symbol: "exclamationmark.triangle.fill", tint: .orange)
                     case nil: EmptyView()
                     }
                 }
@@ -199,10 +238,10 @@ struct SettingsView: View {
                     Link("Ask or suggest", destination: Feedback.discussionURL(category: "q-a"))
                     Link("Help and FAQ", destination: URL(string: "https://github.com/\(UpdateChecker.repository)/wiki")!)
                 }
-                Toggle("Check for updates when the window opens", isOn: $model.config.checkUpdates)
-                Text("Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Toggle("Check for updates when the window opens", isOn: $model.config.checkUpdates)
+                    InfoButton(model: model, id: "updates", text: "Asks GitHub for the list of public releases of STLer, at most once a day. Nothing about you or your files is sent.")
+                }
             }
         }
         .formStyle(.grouped)
@@ -228,7 +267,7 @@ struct SettingsView: View {
         guard let estimate = model.homeEstimate else { return "Counting model files in your home folder ..." }
         let parts = FileType.allCases.map { "\($0.title) \(estimate[$0] ?? 0)" }.joined(separator: ", ")
         let total = estimate.values.reduce(0, +)
-        return "About \(total) model files in your home folder (\(parts)), counted from the Spotlight index, so unindexed files are missed. Clear and Apply still ask for confirmation before they run."
+        return "About \(total) model files in your home folder (\(parts)), counted from the Spotlight index, so unindexed files are missed."
     }
 
     private func typePage(_ type: FileType) -> some View {
@@ -249,49 +288,30 @@ struct SettingsView: View {
                     Picker("Projection", selection: style(type, \.projection)) {
                         ForEach(Projection.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
                     }
-                    Toggle("System default colour", isOn: systemColor(type))
-                    ColorPicker("Colour", selection: colorBinding(type, \.color), supportsOpacity: false)
+                    Toggle("System default color", isOn: systemColor(type))
+                    ColorPicker("Color", selection: colorBinding(type, \.color), supportsOpacity: false)
                         .disabled(model.config[type].color == "system")
                     if type == .threeMF { modelColorsSlider(type) }
                     if type != .stl { limitPicker(type) }
                 }
                 labelSection(type)
-                if !model.hasUnappliedChanges(type) {
-                    Section("Actions") { actionsPanel(type) }
-                }
+                Section("Icons") { actionsPanel(type) }
             }
         }
         .formStyle(.grouped)
-        .overlay(alignment: .bottom) {
-            if model.hasUnappliedChanges(type) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("These settings are not applied to your files yet", systemImage: "circle.fill")
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.orange)
-                    actionsPanel(type)
-                }
-                .padding(12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(.orange.opacity(0.4)))
-                .shadow(radius: 8, y: 2)
-                .padding(16)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: model.hasUnappliedChanges(type))
     }
 
-    /// How much of the colours stored in the file shows instead of the single fill colour.
+    /// How much of the colors stored in the file shows instead of the single fill color.
     private func modelColorsSlider(_ type: FileType) -> some View {
         let percent = Binding<Double>(get: { Double(model.config[type].modelColors) }, set: { model.config[type].modelColors = Int($0) })
         return VStack(alignment: .leading, spacing: 2) {
-            LabeledContent("Model colours") {
+            LabeledContent("Model colors") {
                 HStack {
                     Slider(value: percent, in: 0...100, step: 5).frame(width: 180)
                     Text("\(model.config[type].modelColors)%").monospacedDigit().frame(width: 40, alignment: .trailing)
                 }
             }
-            Text("0% paints everything with the fill colour. Higher values show the colours stored in the file (3MF materials, Bambu/Orca filaments); parts without a colour keep the fill.")
+            Text("0% paints everything with the fill color. Higher values show the colors stored in the file (3MF materials, Bambu/Orca filaments); parts without a color keep the fill.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -306,12 +326,12 @@ struct SettingsView: View {
         }
     }
 
-    /// Clear and Apply with the place they work on. Sits in the form, and floats above it while changes are waiting.
+    /// Clear and Regenerate with the place they work on. Changed settings apply on their own; Regenerate forces every icon to be drawn again.
     private func actionsPanel(_ type: FileType) -> some View {
         HStack {
-            Button("Clear...") { model.request(.clear, for: type) }
-            Button("Apply") { model.request(.apply, for: type) }
-                .buttonStyle(.borderedProminent)
+            Button("Clear...") { model.requestClear(for: type) }
+            Button("Regenerate") { model.scheduleApply(type, delay: 0, force: true) }
+                .help("Draw every icon again, even where it is up to date")
             Spacer()
             Text(scopeDescription)
                 .font(.callout)
@@ -330,10 +350,11 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             if model.config.stepEngine == .freecad {
                 LabeledContent("freecadcmd") {
-                    Text(model.freecad ?? "Not found")
-                        .foregroundStyle(model.freecad == nil ? .orange : .secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    if let path = model.freecad {
+                        Text(path).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    } else {
+                        StatusLabel(text: "Not found", symbol: "exclamationmark.triangle.fill", tint: .orange)
+                    }
                 }
                 HStack {
                     Button("Find automatically") { model.searchFreecad() }
@@ -345,10 +366,11 @@ struct SettingsView: View {
                 .disabled(model.busy)
             } else {
                 LabeledContent("OpenCASCADE") {
-                    Text(OpenCascade.prefix ?? "Not installed")
-                        .foregroundStyle(model.stepReady ? Color.secondary : Color.orange)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    if model.stepReady {
+                        Text(OpenCascade.prefix ?? "").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    } else {
+                        StatusLabel(text: "Not installed", symbol: "exclamationmark.triangle.fill", tint: .orange)
+                    }
                 }
                 HStack {
                     if !model.stepReady {
@@ -357,11 +379,12 @@ struct SettingsView: View {
                     }
                 }
             }
-            Text(model.config.stepEngine == .freecad
-                ? "STEP files are converted with FreeCAD (about 2 GB). Use either FreeCAD or OpenCASCADE, not both."
-                : "STEP files are converted with the OpenCASCADE library, installed by Homebrew in Terminal. Use either FreeCAD or OpenCASCADE, not both.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("Use either FreeCAD or OpenCASCADE, not both.").font(.callout).foregroundStyle(.secondary)
+                InfoButton(model: model, id: "engine", text: model.config.stepEngine == .freecad
+                    ? "STEP files are converted with FreeCAD (about 2 GB). Use either FreeCAD or OpenCASCADE, not both."
+                    : "STEP files are converted with the OpenCASCADE library, installed by Homebrew in Terminal. Use either FreeCAD or OpenCASCADE, not both.")
+            }
         }
         .onAppear { if model.config.stepEngine == .freecad, model.freecad == nil { model.searchFreecad(silent: true) } }
     }
@@ -372,10 +395,20 @@ struct SettingsView: View {
                 ForEach(LabelCorner.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             if model.config[type].label.corner != .off {
-                ColorPicker("Text colour", selection: colorBinding(type, \.label.textColor), supportsOpacity: false)
-                ColorPicker("Background colour", selection: colorBinding(type, \.label.backgroundColor), supportsOpacity: false)
-                Slider(value: radiusBinding(type), in: 0...50, step: 1) { Text("Corner radius") }
-                Slider(value: label(type, \.opacity), in: 0...1) { Text("Opacity") }
+                ColorPicker("Text color", selection: colorBinding(type, \.label.textColor), supportsOpacity: false)
+                ColorPicker("Background color", selection: colorBinding(type, \.label.backgroundColor), supportsOpacity: false)
+                LabeledContent("Corner radius") {
+                    HStack {
+                        Slider(value: radiusBinding(type), in: 0...50, step: 1).frame(width: 180)
+                        Text("\(model.config[type].label.cornerRadius) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
+                    }
+                }
+                LabeledContent("Opacity") {
+                    HStack {
+                        Slider(value: label(type, \.opacity), in: 0...1).frame(width: 180)
+                        Text("\(Int((model.config[type].label.opacity * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+                    }
+                }
             }
         }
     }
@@ -419,17 +452,15 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Welcome to STLer").font(.title.bold())
             welcomeBlock("cube.transparent", "What it does",
-                "macOS shows STL, 3MF and STEP files with a plain generic icon. STLer draws a small picture of the model itself and sets it as the file's icon in Finder, so you see what is inside before you open it.")
+                "macOS shows STL, 3MF and STEP files with a plain generic icon. STLer draws a small picture of the model and sets it as the file's icon in Finder.")
             welcomeBlock("paintbrush", "How it works",
-                "The model is rendered off-screen from the angle and in the colour you choose for each file type here. The picture is stored as the file's own custom icon. The file's contents and modification date stay as they were, and Clear removes the icons again.")
-            welcomeBlock("photo.on.rectangle", "Why icons and not previews",
-                "macOS has its own thumbnail for STL files and an app cannot replace it. Setting a custom icon on each file is the only way to change what Finder shows.")
-            welcomeBlock("terminal", "Why there is a command line tool",
-                "Apply in this window only covers the files that exist right now. Files that arrive later, such as a download, a folder you open in Finder or a file you open from a flash drive, need something that keeps watching in the background, also when this window is closed. That is stler, a small command line program. Install puts a copy in ~/.local/bin and macOS starts it at login. The first time it asks for permission to see which folder Finder shows.")
+                "The model is rendered off-screen in the view and color you choose for each file type. The file itself and its modification date stay as they were, and Clear removes the icons again.")
+            welcomeBlock("terminal", "Why a background helper",
+                "Your settings apply to the files that exist now. For files that arrive later, such as downloads or a folder you open in Finder, a small helper (the stler command) keeps watching, also when this window is closed. Setup installs it so macOS starts it at login.")
             HStack {
                 Spacer()
                 Button("Not now") { model.dismissWelcome(setup: false) }
-                Button("Set up stler follow") { model.dismissWelcome(setup: true) }
+                Button("Set up the helper") { model.dismissWelcome(setup: true) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
@@ -438,7 +469,7 @@ struct SettingsView: View {
         .frame(width: 560)
     }
 
-    private static let followExplanation = "stler follow is a small background helper. When you open a folder in Finder it gives new and changed STL, 3MF and STEP files their icons right away, so you do not have to press Apply. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
+    private static let followExplanation = "The background helper (the stler follow command) gives new and changed STL, 3MF and STEP files their icons when you open a folder in Finder, so you do not have to do anything. It starts at login, uses almost no resources, and needs permission to see which folder Finder shows (macOS asks the first time)."
 
     private var followStatusText: String {
         model.agent == .running ? "Running" : model.agent == .stopped ? "Installed, not running" : "Not installed"
@@ -448,16 +479,14 @@ struct SettingsView: View {
     /// Click shows what it is and leads to General, where it can be installed.
     private var agentButton: some View {
         Button { model.showAgentInfo.toggle() } label: {
-            Label("stler", systemImage: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+            Label { Text("Helper") } icon: { Image(systemName: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(model.agent == .running ? Color.green : Color.orange) }
                 .labelStyle(.titleAndIcon)
-                .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
         }
-        .help(model.agent == .running ? "stler follow is installed and running" : "stler follow is not running")
+        .help(model.agent == .running ? "The background helper is installed and running" : "The background helper is not running")
         .popover(isPresented: $model.showAgentInfo, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 10) {
-                Label("stler follow: \(followStatusText.lowercased())", systemImage: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                StatusLabel(text: "Background helper: \(followStatusText.lowercased())", symbol: model.agent == .running ? "checkmark.circle.fill" : "exclamationmark.triangle.fill", tint: model.agent == .running ? .green : .orange)
                     .font(.headline)
-                    .foregroundStyle(model.agent == .running ? Color.green : Color.orange)
                 Text(Self.followExplanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button(model.agent == .running ? "Open General" : "Set up in General") {
                     model.showAgentInfo = false
@@ -477,9 +506,10 @@ struct SettingsView: View {
             Button {
                 model.showJournal.toggle()
             } label: {
-                Label(model.activeJobs > 0 ? "\(model.activeJobs)" : "", systemImage: "list.bullet.rectangle")
+                Label(model.activeJobs > 0 ? "\(model.activeJobs)" : "", systemImage: "list.bullet.rectangle").frame(minWidth: 20, minHeight: 20)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("Journal")
             .help("Journal")
             .popover(isPresented: $model.showJournal, arrowEdge: .top) { journalPanel }
         }
@@ -511,7 +541,7 @@ struct SettingsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if model.journal.isEmpty {
-                        Text("Nothing yet. Apply, Clear and `stler follow` show up here.").font(.callout).foregroundStyle(.secondary).padding(8)
+                        Text("Nothing yet. Icon changes, Clear and the background helper show up here.").font(.callout).foregroundStyle(.secondary).padding(8)
                     }
                     ForEach(model.journal) { job in journalRow(job).id(job.id) }
                 }
@@ -543,8 +573,9 @@ struct SettingsView: View {
             }
             Spacer(minLength: 0)
             if job.state != .done {
-                Button { model.cancel(job) } label: { Image(systemName: "xmark.circle.fill") }
+                Button { model.cancel(job) } label: { Image(systemName: "xmark.circle.fill").frame(minWidth: 20, minHeight: 20).contentShape(Rectangle()) }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel(job.state == .running ? "Cancel \(job.title)" : "Remove \(job.title) from the queue")
                     .foregroundStyle(.secondary)
                     .help(job.state == .running ? "Cancel this job" : "Remove from the queue")
             }
@@ -604,14 +635,10 @@ struct SettingsView: View {
 
     private var confirmationTitle: String {
         guard let pending = model.pending else { return "" }
-        let count = "\(pending.files.count) \(pending.type.title) files"
-        return pending.action == .clear ? "Remove STLer icons from \(count)?" : "Apply the \(pending.type.title) settings to \(count)?"
+        return "Remove STLer icons from \(pending.files.count) \(pending.type.title) files?"
     }
 
     private func confirmationMessage(_ pending: SettingsModel.Pending) -> String {
-        if pending.action == .clear { return "Only icons set by STLer are removed. Icons you set yourself stay." }
-        return model.config.scope == .home
-            ? "This walks your whole home folder and may take a while. Icons set by other tools on these files are replaced."
-            : "Icons set by other tools on these files are replaced."
+        "Only icons set by STLer are removed. Icons you set yourself stay."
     }
 }

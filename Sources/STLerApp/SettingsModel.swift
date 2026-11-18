@@ -9,13 +9,10 @@ final class SettingsModel: ObservableObject {
         case type(FileType)
     }
 
-    enum Action { case clear, apply }
-
-    /// A Clear or Apply waiting for the user's confirmation, with the files it would touch.
+    /// A Clear waiting for the user's confirmation, with the files it would touch.
     struct Pending: Identifiable {
         let id = UUID()
         let type: FileType
-        let action: Action
         let files: [String]
     }
 
@@ -25,6 +22,7 @@ final class SettingsModel: ObservableObject {
             try? config.save()
             if config.freecadPath != oldValue.freecadPath || config.stepEngine != oldValue.stepEngine { refreshFreecad() }
             refreshPreview()
+            scheduleApply(after: oldValue)
         }
     }
     @Published var page = Page.general {
@@ -45,12 +43,11 @@ final class SettingsModel: ObservableObject {
     /// Whether `stler follow` is installed as a LaunchAgent and running.
     @Published private(set) var agent = FollowAgent.State.notInstalled
     @Published var showAgentInfo = false
+    /// Id of the explanation popover that is open (see `InfoButton`), `nil` when none is.
+    @Published var infoShown: String?
     /// Result of the last look for a newer release; `nil` before any check.
     @Published private(set) var update: UpdateChecker.Outcome?
     @Published private(set) var checkingUpdate = false
-    /// Signature of each type's settings as last applied to files, remembered across launches. A type whose current
-    /// signature differs has changes that no file shows yet.
-    @Published private(set) var applied: [FileType: String] = [:]
     /// The first-launch explanation; shown once, and again from the help button in the header.
     @Published var showWelcome = !UserDefaults.standard.bool(forKey: "welcomeShown")
     @Published var pending: Pending?
@@ -65,6 +62,12 @@ final class SettingsModel: ObservableObject {
 
     private let queue = DispatchQueue(label: "stler.render", qos: .userInitiated)
     private let jobQueue = JobQueue()
+    /// Waiting period after the last change of a type before its icons are rendered, so a slider drag is one job.
+    private static let applyDelay: TimeInterval = 1
+    private var applyTimers: [FileType: DispatchWorkItem] = [:]
+    /// Bumped whenever the running or counting Apply of a type is superseded, so a stale count is dropped.
+    private var applyTokens: [FileType: Int] = [:]
+    private var applyJobs: [FileType: UUID] = [:]
     private var previewToken = 0
 
     init() {
@@ -72,15 +75,6 @@ final class SettingsModel: ObservableObject {
             let remembered = UserDefaults.standard.string(forKey: "sample.\(type.rawValue)").map { URL(fileURLWithPath: $0) }
             samples[type] = remembered.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 ?? Bundle.main.url(forResource: "3DBenchy", withExtension: type.sampleExtension)
-        }
-        for type in FileType.allCases {
-            let key = "applied.\(type.rawValue)"
-            if let known = UserDefaults.standard.string(forKey: key) {
-                applied[type] = known
-            } else {
-                applied[type] = Signature.make(for: config, type: type)
-                UserDefaults.standard.set(applied[type], forKey: key)
-            }
         }
         refreshFreecad()
         refreshPreview()
@@ -129,28 +123,17 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    /// True when the settings of `type` changed since they were last applied to files.
-    func hasUnappliedChanges(_ type: FileType) -> Bool {
-        config[type].enabled && applied[type] != Signature.make(for: config, type: type)
-    }
-
-    private func markApplied(_ type: FileType, config: Config) {
-        let signature = Signature.make(for: config, type: type)
-        applied[type] = signature
-        UserDefaults.standard.set(signature, forKey: "applied.\(type.rawValue)")
-    }
-
     /// Opens Terminal with `stler install`, see `FollowAgent.installInTerminal`.
     func installFollow() { status = FollowAgent.installInTerminal(appBundle: Bundle.main.bundleURL) }
 
     /// Stops or starts the installed agent right away, no Terminal needed.
     func toggleFollow() {
         let wasRunning = agent == .running
-        status = wasRunning ? "Stopping stler follow ..." : "Starting stler follow ..."
+        status = wasRunning ? "Stopping the background helper ..." : "Starting the background helper ..."
         DispatchQueue.global(qos: .userInitiated).async {
             let ok = wasRunning ? FollowAgent.stop() : FollowAgent.start()
             DispatchQueue.main.async {
-                self.status = ok ? (wasRunning ? "stler follow stopped. It starts again at login, or press Start." : "stler follow started.") : "launchctl refused. Try Reinstall."
+                self.status = ok ? (wasRunning ? "The background helper stopped. It starts again at login, or press Start." : "The background helper started.") : "launchctl refused. Try Reinstall."
                 self.refreshAgent()
             }
         }
@@ -158,7 +141,7 @@ final class SettingsModel: ObservableObject {
 
     func checkFollow() {
         refreshAgent()
-        status = "Checking stler follow ..."
+        status = "Checking the background helper ..."
     }
 
     /// Merges the window's own jobs with the shared log of `stler follow`: finished ones by time, then running, then queued.
@@ -285,52 +268,89 @@ final class SettingsModel: ObservableObject {
         }
     }
 
-    /// Counts the files first, then asks for confirmation (always for Clear, for Apply on the home folder) or runs right away.
-    func request(_ action: Action, for type: FileType) {
+    /// Counts the files, then asks for confirmation: Clear is the one action that takes icons away.
+    func requestClear(for type: FileType) {
         let paths = config.scopePaths
         guard !paths.isEmpty else { status = "Add a folder first (General)."; return }
-        let needsConfirmation = action == .clear || config.scope == .home
         busy = true
         status = "Counting \(type.title) files ..."
-        queue.async {
-            var seen = Set<String>()
-            let files = paths.flatMap { FileScanner.spotlight(type, in: $0) }.filter { seen.insert($0).inserted }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let files = Self.modelFiles(type, in: paths)
             DispatchQueue.main.async {
                 self.busy = false
                 if files.isEmpty {
                     self.status = "No \(type.title) files in the chosen scope."
-                } else if needsConfirmation {
-                    self.status = ""
-                    self.pending = Pending(type: type, action: action, files: files)
                 } else {
-                    self.run(action, type, files)
+                    self.status = ""
+                    self.pending = Pending(type: type, files: files)
                 }
             }
         }
     }
 
+    /// The file type whose page is open, for the menu commands; `nil` on General.
+    var currentType: FileType? {
+        if case .type(let type) = page { return type }
+        return nil
+    }
+
     func confirmPending() {
         guard let pending else { return }
         self.pending = nil
-        run(pending.action, pending.type, pending.files)
+        applyTimers[pending.type]?.cancel()
+        cancelApply(pending.type)
+        let files = pending.files
+        showJournal = true
+        jobQueue.enqueue("Clear \(pending.type.title) icons (\(files.count) files)") { reporter in
+            let r = IconBatch.reset(files, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
+            return (r.interrupted ? "Cancelled. " : "") + "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
+        }
     }
 
-    private func run(_ action: Action, _ type: FileType, _ files: [String]) {
-        let config = config
-        showJournal = true
-        switch action {
-        case .clear:
-            jobQueue.enqueue("Clear \(type.title) icons (\(files.count) files)") { reporter in
-                let r = IconBatch.reset(files, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
-                return (r.interrupted ? "Cancelled. " : "") + "Cleared \(r.reset) icons, left \(r.untouched) untouched (not set by STLer)."
-            }
-        case .apply:
-            markApplied(type, config: config)
-            jobQueue.enqueue("Apply \(type.title) (\(files.count) files)") { reporter in
-                let r = IconBatch.apply(files, config: config, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
-                return (r.interrupted ? "Cancelled. " : "") + "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
+    /// Settings apply on their own: a type whose settings changed is rendered again, and every enabled type is
+    /// when folders were added or the scope switched. Removing a folder starts nothing.
+    private func scheduleApply(after old: Config) {
+        let scopeGrew = config.scope != old.scope || !Set(config.scopeFolders).isSubset(of: old.scopeFolders)
+        for type in FileType.allCases where config[type].enabled && (scopeGrew || config[type] != old[type]) {
+            scheduleApply(type)
+        }
+    }
+
+    /// Renders `type` over the scope after a short quiet period. A newer change cancels the older Apply of the type,
+    /// waiting or running, and starts over with the new settings.
+    /// - Parameter force: Draw every icon again, also where its signature already matches (Regenerate).
+    func scheduleApply(_ type: FileType, delay: TimeInterval = SettingsModel.applyDelay, force: Bool = false) {
+        applyTimers[type]?.cancel()
+        cancelApply(type)
+        let timer = DispatchWorkItem { [weak self] in self?.startApply(type, force: force) }
+        applyTimers[type] = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: timer)
+    }
+
+    private func cancelApply(_ type: FileType) {
+        applyTokens[type, default: 0] += 1
+        if let id = applyJobs.removeValue(forKey: type) { jobQueue.cancel(id) }
+    }
+
+    private func startApply(_ type: FileType, force: Bool) {
+        let config = config, paths = config.scopePaths
+        guard config[type].enabled, type != .step || stepReady, !paths.isEmpty else { return }
+        let token = applyTokens[type, default: 0]
+        DispatchQueue.global(qos: .utility).async {
+            let files = Self.modelFiles(type, in: paths)
+            DispatchQueue.main.async {
+                guard self.applyTokens[type, default: 0] == token, !files.isEmpty else { return }
+                self.applyJobs[type] = self.jobQueue.enqueue("\(force ? "Regenerate" : "Apply") \(type.title) (\(files.count) files)") { reporter in
+                    let r = IconBatch.apply(files, config: config, force: force, onProgress: reporter.progress, shouldContinue: { !reporter.isCancelled() })
+                    return (r.interrupted ? "Cancelled. " : "") + "Rendered \(r.rendered), skipped \(r.skipped), failed \(r.failed)." + (r.messages.isEmpty ? "" : " " + r.messages.prefix(3).joined(separator: "; "))
+                }
             }
         }
+    }
+
+    private static func modelFiles(_ type: FileType, in paths: [String]) -> [String] {
+        var seen = Set<String>()
+        return paths.flatMap { FileScanner.spotlight(type, in: $0) }.filter { seen.insert($0).inserted }
     }
 
     private func refreshPreview() {
