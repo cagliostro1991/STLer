@@ -11,6 +11,9 @@ A small macOS tool that renders isometric icons for `.stl`, `.3mf` and `.step` f
 ```
 make build   # build/stler (CLI) and build/STLer.app (settings window)
 make test    # about 100 checks, around 20 seconds (the bundled 3MF sample is big)
+make check   # type-checks the three builds, lints with swift-format, checks whitespace
+make format  # formats every Swift file with swift-format (config: .swift-format)
+make editor  # writes compile_commands.json for the editor (see below)
 ```
 
 You only need the Command Line Tools. Tests use temp files and a temp config, they never touch your files.
@@ -23,6 +26,8 @@ You only need the Command Line Tools. Tests use temp files and a temp config, th
 - `Tests/SelfCheck/main.swift` the tests, a plain executable (no XCTest, that needs Xcode).
 - `Tools/` one-off scripts that generate the bundled 3MF and STEP samples (ADR 0018).
 - `docs/` architecture, ADRs (why), knowledge notes (gotchas and recipes), roadmap (what is left).
+
+Editors: VS Code, Cursor and Zed read `.vscode/` and `.zed/` and talk to `sourcekit-lsp`. There is no Package.swift (the build is plain `swiftc`), so run `make editor` once after cloning, and again when files are added or removed. Without `compile_commands.json` the editor analyses each file alone and shows red "cannot find ... in scope" errors on code that compiles. Format on save uses swift-format with `.swift-format` (100 columns, 4 spaces); `make check` fails on code that is not formatted that way.
 
 Keep directory names apart by more than case. APFS does not care about case and two folders will silently merge.
 

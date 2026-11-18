@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "build", "type": "shell", "command": "make build", "group": "build" },
+    { "label": "test", "type": "shell", "command": "make test", "group": "test" },
+    { "label": "check", "type": "shell", "command": "make check" },
+    { "label": "regenerate compile_commands.json", "type": "shell", "command": "make editor" }
+  ]
+}

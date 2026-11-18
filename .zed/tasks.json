@@ -1,0 +1,6 @@
+[
+  { "label": "build", "command": "make build" },
+  { "label": "test", "command": "make test" },
+  { "label": "check", "command": "make check" },
+  { "label": "regenerate compile_commands.json", "command": "make editor" }
+]
