@@ -6,7 +6,7 @@ Isometric (or orthographic) icons for `.stl`, `.3mf` and `.step` files in macOS 
 [![License: MIT](https://img.shields.io/github/license/cagliostro1991/STLer)](LICENSE)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-blue)
 
-**[Download the latest release](https://github.com/cagliostro1991/STLer/releases)** (macOS 13 or newer) or see [Install](#install).
+**[Download the latest release](https://github.com/cagliostro1991/STLer/releases)** (macOS 13 or newer) or see [Install](#install). Website: **[cagliostro1991.github.io/STLer](https://cagliostro1991.github.io/STLer/)**.
 
 ![STLer preview: isometric, coloured and front view](docs/preview.png)
 

@@ -2,6 +2,7 @@
 
 STLer puts a small picture of the model on `.stl`, `.3mf` and `.step` files in macOS Finder, instead of the generic icon.
 
+- **Website:** [cagliostro1991.github.io/STLer](https://cagliostro1991.github.io/STLer/)
 - **New here?** [Getting started](Getting-Started)
 - **Something odd?** [Troubleshooting](Troubleshooting) and the [FAQ](FAQ)
 - **Want to ask, suggest or report?** [Feedback and requests](Feedback-and-Requests)
