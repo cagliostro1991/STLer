@@ -6,7 +6,7 @@ Thanks for looking. The short version:
 2. Keep the change small and about one thing.
 3. If you made a decision or hit a macOS surprise, write it down in `docs/adr/` or `docs/knowledge/` in the same PR.
 
-Everything about the layout, code style and the traps we already fell into is in [AGENTS.md](AGENTS.md). It is written for people and coding assistants alike, so it is the only place to read.
+How the maintainer works (branches, commits, releases) is in [docs/process.md](docs/process.md). Everything about the layout, code style and the traps we already fell into is in [AGENTS.md](AGENTS.md). It is written for people and coding assistants alike, so it is the only place to read.
 
 ## Setup
 

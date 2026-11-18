@@ -53,6 +53,8 @@ Details and fixes are in `docs/knowledge/macos-gotchas.md`. The short list:
 
 ## Changing things
 
+The whole path from a branch to a release, with the formats and who approves what, is in [docs/process.md](docs/process.md). The rules below are the short version.
+
 - One thing per commit, conventional style: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`.
 - Every bug fix comes with at least one test that fails without the fix. If the bug lives where tests cannot reach (the SwiftUI window), pull the logic into `STLerCore` so it can be tested, or, when that is not possible, write an ADR that says why it is untested and mark its status `open, needs refactoring`. It is not a great decision, but it is an honest one, and the ADR is the debt ledger.
 - Run `make test` before and after. If you touch the icon writing code, check that the mtime tests still fail when the date restore is disabled (recipe in `docs/knowledge/testing-safely.md`).
